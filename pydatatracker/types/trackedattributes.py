@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Project: bastproxy
-# Filename: libs/tracking/utils/attributes.py
+# Filename: pydatatracker/types/trackedattributes.py
 #
 # File Description: Holds a class that monitors attributes
 #
@@ -49,7 +49,7 @@ from typing import Any, TYPE_CHECKING
 from ..types._trackbase import TrackBase, track_changes
 
 if TYPE_CHECKING:
-    from libs.tracking.utils.changelog import ChangeLogEntry
+    from ..utils.changelog import ChangeLogEntry
 
 
 class TrackedAttr(TrackBase):

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Project: bastproxy
-# Filename: libs/tracking/types/trackedlist.py
+# Filename: pydatatracker/types/trackedlist.py
 #
 # File Description: Holds a list implementation with change tracking.
 #
