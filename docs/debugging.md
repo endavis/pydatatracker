@@ -33,6 +33,30 @@ payload["status"] = "ready"
 print(collector.as_list())
 ```
 
+### Log observer
+```python
+import logging
+logger = logging.getLogger("changes")
+
+def log_observer(change):
+    logger.info("Change: %s -> %s", change.extra.get("location"), change.extra.get("action"))
+
+payload.tracking_add_observer(log_observer)
+payload["status"] = "ready"
+```
+
+### JSON observer
+```python
+import json
+from pathlib import Path
+
+def json_observer(change):
+    Path("changes.jsonl").write_text(json.dumps(change.extra) + "\n", append=True)
+
+payload.tracking_add_observer(json_observer)
+payload["status"] = "ready"
+```
+
 ## Export change history per request
 ```python
 changes = payload.tracking_changes()
