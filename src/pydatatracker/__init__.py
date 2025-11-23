@@ -37,6 +37,7 @@ Classes:
 """
 # imported to prevent circular references
 from .types._trackbase import TrackBase  # noqa: F401
+from ._version import __version__
 
 __all__ = [
     "TrackedDict",
@@ -44,6 +45,7 @@ __all__ = [
     "TrackedAttr",
     "ChangeLogEntry",
     "add_to_ignore_in_stack",
+    "__version__",
 ]
 
 from .types.trackeddict import TrackedDict
