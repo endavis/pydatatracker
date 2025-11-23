@@ -427,23 +427,6 @@ class TrackBase:
             for observer in self._tracking_observers[priority]:
                 observer(change_log_entry)
 
-    def tracking_add_change(self, change_log_entry: ChangeLogEntry) -> None:
-        """Add a change log record to the list of changes.
-
-        This method appends a new change log entry to the list of tracked changes
-        for the instance. It ensures that the changes are sorted, maintaining the
-        order of modifications for accurate tracking and retrieval.
-
-        Args:
-            change_log_entry: The change log entry to be added to the list of changes.
-
-        Returns:
-            None
-
-        """
-        self._tracking_changes.append(change_log_entry)
-        self._tracking_changes.sort()
-
     def tracking_create_change(self, **kwargs) -> None:
         """Create a change log entry for the tracked object.
 

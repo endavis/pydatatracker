@@ -81,3 +81,13 @@ def test_capture_stack_is_opt_in() -> None:
     tracked_verbose["foo"] = "bar"
     verbose_change = tracked_verbose.tracking_changes()[-1]
     assert verbose_change.stack, "stack should be populated when capture is enabled"
+
+
+def test_tracking_changes_preserve_insertion_order() -> None:
+    tracked = TrackedDict()
+    tracked["first"] = 1
+    tracked["second"] = 2
+
+    last_two = tracked.tracking_changes()[-2:]
+    assert [entry.extra["location"] for entry in last_two] == ["first", "second"]
+    assert last_two[0].created_time <= last_two[1].created_time
