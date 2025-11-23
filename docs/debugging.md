@@ -74,3 +74,6 @@ recent = payload.changes_since(latest.created_time)
 ## Benchmarking observability costs
 
 Run `just benchmark` to quantify how actors, snapshots, and stack capture affect throughput. Compare modes before enabling diagnostic knobs in production.
+
+## Async observers
+Use `async_queue_observer` to forward change dictionaries into an `asyncio.Queue` while continuing to operate in synchronous contexts.

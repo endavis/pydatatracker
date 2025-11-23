@@ -107,17 +107,8 @@ tracked["mode"] = "debug"
 print(collector.as_list()[-1].extra["location"])  # mode
 ```
 
-You can also register custom observers; e.g., a simple logger:
+You can also register async-friendly observers using `async_queue_observer` to push changes onto an `asyncio.Queue`.
 
-```python
-import logging
-logger = logging.getLogger("pydatatracker")
-
-def log_observer(change):
-    logger.info("changed %s via %s", change.extra.get("location"), change.extra.get("action"))
-
-tracked.tracking_add_observer(log_observer)
-```
 
 ## Benchmarks
 

@@ -113,3 +113,18 @@ def json_file_observer(path: str | Path) -> Callable[[ChangeLogEntry], None]:
             handle.write(json.dumps(change.to_dict()) + "\n")
 
     return _observer
+
+
+def async_queue_observer(queue):
+    import asyncio
+
+    async def _async_enqueue(change):
+        await queue.put(change.to_dict())
+
+    def _observer(change):
+        if asyncio.iscoroutinefunction(queue.put):
+            asyncio.create_task(_async_enqueue(change))
+        else:
+            queue.put(change.to_dict())
+
+    return _observer

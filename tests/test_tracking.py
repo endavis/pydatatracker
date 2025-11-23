@@ -10,7 +10,7 @@ import pytest
 import logging
 
 from pydatatracker import TrackedDict, ChangeCollector
-from pydatatracker.observers import logging_observer, json_file_observer
+from pydatatracker.observers import logging_observer, json_file_observer, async_queue_observer
 from pydatatracker.observers import FilteredObserver
 
 
@@ -180,3 +180,33 @@ def test_logging_observer_uses_logger(caplog) -> None:
         tracked['foo'] = 'bar'
 
     assert any('foo' in record.message for record in caplog.records)
+
+
+def test_async_queue_observer_handles_coroutines():
+    tracked = TrackedDict()
+
+    class DummyQueue:
+        def __init__(self):
+            self.items = []
+        def put(self, value):
+            self.items.append(value)
+
+    queue = DummyQueue()
+    observer = async_queue_observer(queue)
+    tracked.tracking_add_observer(observer)
+
+    tracked['foo'] = 'bar'
+    assert queue.items
+
+def test_async_queue_observer_synchronous_queue():
+    tracked = TrackedDict()
+    class SyncQueue:
+        def __init__(self):
+            self.items = []
+        def put(self, value):
+            self.items.append(value)
+    queue = SyncQueue()
+    observer = async_queue_observer(queue)
+    tracked.tracking_add_observer(observer)
+    tracked['foo'] = 'bar'
+    assert queue.items
