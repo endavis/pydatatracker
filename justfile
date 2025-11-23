@@ -27,3 +27,6 @@ check: lint format-check test
 
 clean:
 	rm -rf .ruff_cache .pytest_cache htmlcov .coverage*
+
+benchmark:
+	uv run python scripts/benchmark.py
