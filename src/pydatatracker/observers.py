@@ -78,3 +78,6 @@ class FilteredObserver:
         if self.locations and location not in self.locations:
             return
         return self.observer(change)
+
+def filtered_observer(observer, *, actions=None, locations=None):
+    return FilteredObserver(observer, actions=actions, locations=locations)

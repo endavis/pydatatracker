@@ -142,3 +142,14 @@ def test_filtered_observer_filters_events() -> None:
     tracked['foo'] = 3
 
     assert collected == ['foo']
+
+
+def test_change_log_entry_to_dict() -> None:
+    tracked = TrackedDict()
+    tracked['count'] = 1
+    entry = tracked.last_change()
+    assert entry is not None
+    serialized = entry.to_dict()
+    assert serialized['extra']['location'] == 'count'
+    assert 'actor' in serialized
+    assert serialized['created_time'].endswith('Z') or serialized['created_time'].count(':') >= 2

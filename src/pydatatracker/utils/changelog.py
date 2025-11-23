@@ -83,6 +83,7 @@ def fix_header(header_name: str) -> str:
 
 
 class ChangeLogEntry:
+    ...
     """Represents an entry in the change log for tracking modifications.
 
     This class is used to create and manage a change log entry, which
@@ -306,6 +307,18 @@ class ChangeLogEntry:
             )
 
         return tmsg
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the change log entry to a JSON-friendly dict."""
+        return {
+            'uuid': self.uuid,
+            'tracked_item_uuid': self.tracked_item_uuid,
+            'created_time': self.created_time.isoformat(),
+            'actor': self.actor,
+            'stack': self.stack,
+            'tree': self.tree,
+            'extra': self.extra.copy(),
+        }
 
     def format_data(self, name: str, data_lines_to_show: int) -> list[str]:
         """Format the data for a given attribute or extra metadata.
