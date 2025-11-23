@@ -23,6 +23,12 @@ that make it easy to monitor modifications made while composing complex data pay
 └── pyproject.toml     # Build metadata + tooling config
 ```
 
+## Installation
+
+```bash
+pip install pydatatracker
+```
+
 ## Getting started
 
 1. Create and activate a virtual environment managed by `uv`:
@@ -49,9 +55,9 @@ that make it easy to monitor modifications made while composing complex data pay
 
 ## Releasing
 
-Package metadata lives in `pyproject.toml` and the canonical version is stored in
-`src/pydatatracker/_version.py`. Update both the changelog and tests before cutting a
-release.
+- Update `CHANGELOG.md` and `src/pydatatracker/_version.py`.
+- Run `just test` and `just publish` (requires `PYPI_TOKEN`).
+- See `docs/packaging.md` for the full checklist.
 
 ## Resources
 

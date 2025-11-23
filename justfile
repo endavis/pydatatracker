@@ -30,3 +30,10 @@ clean:
 
 benchmark:
 	uv run python scripts/benchmark.py
+
+build:
+	uv build
+
+publish:
+	uv build
+	PYPI_TOKEN=${PYPI_TOKEN:?set PYPI_TOKEN} uv publish --token "$PYPI_TOKEN"
