@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from pydatatracker import TrackedDict
+from pydatatracker import TrackedDict, ChangeCollector
 
 
 def test_tracked_dict_logs_updates() -> None:
@@ -112,3 +112,15 @@ def test_last_change_and_changes_since() -> None:
     cutoff = first_entry.created_time + datetime.timedelta(microseconds=1)
     recent_changes = tracked.changes_since(cutoff)
     assert [entry.extra["location"] for entry in recent_changes] == ["beta"]
+
+
+def test_change_collector_observer_records_events() -> None:
+    tracked = TrackedDict()
+    collector = ChangeCollector()
+    tracked.tracking_add_observer(collector)
+
+    tracked["evt"] = 1
+    tracked["evt"] = 2
+
+    collected_locations = [entry.extra["location"] for entry in collector.as_list()]
+    assert "evt" in collected_locations

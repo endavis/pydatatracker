@@ -56,6 +56,7 @@ projects can observe, audit, and persist state transitions.
 - Repository docs: `docs/`
 - Issues/roadmap: GitHub issues referenced in `AGENTS.md`
 - Contact: Use repo discussion/issues per AGENTS guidance.
+- Debugging cookbook: `docs/debugging.md`
 
 ---
 This file unifies essential agent instructions for this project. For coding/development specifics, see dedicated documentation files.

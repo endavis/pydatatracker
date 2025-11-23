@@ -57,6 +57,7 @@ release.
 
 - Contribution rules: see `AGENTS.md`
 - Architecture notes: `docs/architecture.md`
+- Debugging cookbook: `docs/debugging.md`
 - Issue tracker: open issues against the upstream GitHub repository referenced in the
   project URLs.
 
@@ -84,4 +85,19 @@ Each tracked object exposes `tracking_changes()`, `last_change()`, and `changes_
 ```python
 changes = tracked.changes_since(first_change)
 print([entry.extra["location"] for entry in changes])
+```
+
+## Observers
+
+Register observers to receive every `ChangeLogEntry` as it happens. The bundled `ChangeCollector` stores entries in memory:
+
+```python
+from pydatatracker import ChangeCollector, TrackedDict
+
+tracked = TrackedDict()
+collector = ChangeCollector()
+tracked.tracking_add_observer(collector)
+tracked["mode"] = "debug"
+
+print(collector.as_list()[-1].extra["location"])  # mode
 ```
