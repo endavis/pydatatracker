@@ -19,7 +19,7 @@ class SampleTrackedAttr(TrackedAttr):
 
 
 def _latest_change(tracked: TrackedAttr):
-    return tracked._tracking_changes[-1]
+    return tracked.tracking_changes()[-1]
 
 
 def test_tracked_attr_records_attribute_update() -> None:

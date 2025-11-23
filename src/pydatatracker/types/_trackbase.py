@@ -378,6 +378,22 @@ class TrackBase:
             if observer in self._tracking_observers[priority]:
                 self._tracking_observers[priority].remove(observer)
 
+    def tracking_changes(self, most_recent: int | None = None) -> list[ChangeLogEntry]:
+        """Return a copy of the recorded change log entries.
+
+        Args:
+            most_recent: Optional number of most recent entries to return.
+
+        Returns:
+            A list containing copies of the tracked change log entries.
+
+        """
+        if most_recent is None or most_recent >= len(self._tracking_changes):
+            return list(self._tracking_changes)
+        if most_recent <= 0:
+            return []
+        return list(self._tracking_changes[-most_recent:])
+
     def _tracking_notify_observers(self, change_log_entry: ChangeLogEntry) -> None:
         """Notify all observers of changes to a tracked object.
 

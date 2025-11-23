@@ -6,7 +6,7 @@ from pydatatracker import TrackedDict
 
 
 def _latest_change(tracked: TrackedDict):
-    return tracked._tracking_changes[-1]
+    return tracked.tracking_changes()[-1]
 
 
 def test_tracked_dict_pop_logs_removed_items() -> None:
@@ -34,7 +34,7 @@ def test_tracked_dict_child_updates_do_not_touch_parent_log() -> None:
     assert change.extra["location"] == "child"
     assert "state" in change.extra["value"]
     assert "draft" in change.extra["value"]
-    assert len(parent._tracking_changes) == 2  # no additional entry added
+    assert len(parent.tracking_changes()) == 2  # no additional entry added
 
 
 def test_tracked_dict_child_tracks_its_own_updates() -> None:

@@ -6,7 +6,7 @@ from pydatatracker import TrackedList
 
 
 def _latest_change(tracked: TrackedList):
-    return tracked._tracking_changes[-1]
+    return tracked.tracking_changes()[-1]
 
 
 def test_tracked_list_append_records_index() -> None:
