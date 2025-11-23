@@ -38,7 +38,7 @@ Classes:
 """
 # Standard Library
 import datetime
-import traceback
+import inspect
 import pprint
 import ast
 from uuid import uuid4
@@ -115,8 +115,9 @@ class ChangeLogEntry:
         self.extra = kwargs
         self.header_column_width = 17
         self.created_time = datetime.datetime.now(datetime.timezone.utc)
-        self.stack = self.get_stack()
-        self.actor = self.find_relevant_actor(self.stack)
+        actor = self.extra.pop("actor", None)
+        self.stack = self.get_stack() if actor is None else []
+        self.actor = actor if actor else self.find_relevant_actor()
         self.tree = []
         for item in self.extra:
             if item == "location":
@@ -124,44 +125,36 @@ class ChangeLogEntry:
             if not isinstance(self.extra[item], str):
                 self.extra[item] = repr(self.extra[item])
 
-    def find_relevant_actor(self, stack: list[str]) -> str:
-        """Find the most relevant actor from the stack trace that caused the change.
-
-        Searches through the stack trace in reverse order to find the first line
-        containing 'File' that isn't in the ignore list. This helps identify where the
-        change originated from.
-
-        Args:
-            stack: List of stack trace strings to search through
-
-        Returns:
-            The first relevant stack trace line found, or empty string if none found
-
-        """
-        return next(
-            (
-                line.strip()
-                for line in reversed(stack)
-                if "File" in line
-                and all(actor not in line for actor in _IGNORE_IN_STACK)
-            ),
-            "",
-        )
+    def find_relevant_actor(self) -> str:
+        """Walk the stack to find the first non-tracking frame."""
+        frame = inspect.currentframe()
+        if not frame:
+            return ""
+        # Skip frames inside ChangeLogEntry creation
+        frame = frame.f_back
+        while frame:
+            code = frame.f_code
+            filename = code.co_filename
+            if not any(ignore in filename for ignore in _IGNORE_IN_STACK):
+                return f"File \"{filename}\", line {frame.f_lineno}, in {code.co_name}"
+            frame = frame.f_back
+        return ""
 
     def get_stack(self) -> list[str]:
-        """Retrieve the current stack trace, excluding the last two entries.
-
-        This method captures the current stack trace and filters out the last two
-        entries, which typically correspond to the call to this method and its
-        immediate caller. The resulting stack trace is used for tracking the origin
-        of changes.
-
-        Returns:
-            A list of strings representing the filtered stack trace.
-
-        """
-        stack = traceback.format_stack()
-        return [line for line in stack[:-2] if line.strip()]
+        """Retrieve the current stack trace in a lightweight manner."""
+        stack = []
+        frame = inspect.currentframe()
+        if not frame:
+            return stack
+        frame = frame.f_back  # skip get_stack
+        depth = 0
+        while frame and depth < 25:
+            stack.append(
+                f'File "{frame.f_code.co_filename}", line {frame.f_lineno}, in {frame.f_code.co_name}'
+            )
+            frame = frame.f_back
+            depth += 1
+        return stack
 
     def __repr__(self) -> str:
         """Return a string representation of the ChangeLogEntry.

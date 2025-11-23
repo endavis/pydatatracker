@@ -165,7 +165,6 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
 
     return wrapper
 
-
 class TrackBase:
     """Base class for tracking changes to objects.
 
