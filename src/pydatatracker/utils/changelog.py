@@ -92,7 +92,7 @@ class ChangeLogEntry:
 
     """
 
-    def __init__(self, item_uuid: str, **kwargs) -> None:
+    def __init__(self, item_uuid: str, *, capture_stack: bool = True, **kwargs) -> None:
         """Initialize a new ChangeLogEntry instance.
 
         Creates a new change log entry with a unique identifier and metadata. Sets up
@@ -116,8 +116,12 @@ class ChangeLogEntry:
         self.header_column_width = 17
         self.created_time = datetime.datetime.now(datetime.timezone.utc)
         actor = self.extra.pop("actor", None)
-        self.stack = self.get_stack() if actor is None else []
-        self.actor = actor if actor else self.find_relevant_actor()
+        if capture_stack and actor is None:
+            self.stack = self.get_stack()
+            self.actor = self.find_relevant_actor()
+        else:
+            self.stack = []
+            self.actor = actor or ""
         self.tree = []
         for item in self.extra:
             if item == "location":

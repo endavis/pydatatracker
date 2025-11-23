@@ -52,6 +52,7 @@ import logging
 
 # Project
 from ..utils.changelog import ChangeLogEntry
+from .actor import current_actor
 
 
 def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
@@ -221,12 +222,18 @@ class TrackBase:
         self._tracking_delimiter = tracking_delimiter
         self._tracking_debug_flag = False
         self._tracking_capture_snapshots = kwargs.get("tracking_capture_snapshots", False)
+        self._tracking_capture_stack = kwargs.get("tracking_capture_stack", False)
         if tracking_parent:
             self._tracking_capture_snapshots = getattr(
                 tracking_parent, "_tracking_capture_snapshots", False
             )
+            self._tracking_capture_stack = getattr(
+                tracking_parent, "_tracking_capture_stack", False
+            )
         if "tracking_capture_snapshots" in kwargs:
             self._tracking_capture_snapshots = kwargs["tracking_capture_snapshots"]
+        if "tracking_capture_stack" in kwargs:
+            self._tracking_capture_stack = kwargs["tracking_capture_stack"]
         if tracking_parent:
             tracking_parent._tracking_add_child_tracked_item(tracking_location, self)
 
@@ -457,7 +464,13 @@ class TrackBase:
             kwargs["locked"] = self._tracking_locked
         if "type" not in kwargs:
             kwargs["type"] = self._tracking_is_trackable(self)
-        change_log_entry = ChangeLogEntry(self._tracking_uuid, **kwargs)
+        if "actor" not in kwargs:
+            kwargs["actor"] = current_actor.get()
+        change_log_entry = ChangeLogEntry(
+            self._tracking_uuid,
+            capture_stack=self._tracking_capture_stack,
+            **kwargs,
+        )
         change_log_entry.add_to_tree(
             self._tracking_format_tree_location(
                 change_log_entry.extra.get("location", None)

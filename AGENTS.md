@@ -63,3 +63,4 @@ This file unifies essential agent instructions for this project. For coding/deve
 ## Observability
 - Use `pydatatracker.types.actor.tracking_actor` when you need deterministic actor metadata.
 - Default snapshotting is disabled; set `tracking_capture_snapshots=True` when before/after repr strings are required.
+- Stack traces are also opt-in; pass `tracking_capture_stack=True` only when debugging call sites.

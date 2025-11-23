@@ -67,3 +67,17 @@ def test_snapshot_mode_relative_timing() -> None:
     )
 
     assert snapshot >= baseline
+
+
+def test_capture_stack_is_opt_in() -> None:
+    tracked = TrackedDict()
+    tracked["foo"] = "bar"
+
+    change = tracked.tracking_changes()[-1]
+    assert change.stack == []
+    assert change.actor == ""
+
+    tracked_verbose = TrackedDict(tracking_capture_stack=True)
+    tracked_verbose["foo"] = "bar"
+    verbose_change = tracked_verbose.tracking_changes()[-1]
+    assert verbose_change.stack, "stack should be populated when capture is enabled"

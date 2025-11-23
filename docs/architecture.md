@@ -36,5 +36,6 @@
 ## Observability controls
 
 - `tracking_capture_snapshots`: opt-in repr snapshots per container
+- `tracking_capture_stack`: opt-in stack/actor inference for debugging
 - `tracking_actor` context manager: sets the actor stored on each ChangeLogEntry without stack inspection
-- Shallow frame inspection only runs when no actor is provided
+- Shallow frame inspection only runs when both snapshot and stack capture are disabled

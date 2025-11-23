@@ -75,4 +75,4 @@ with tracking_actor('provisioner'):
 print(tracked.tracking_changes()[0].actor)  # => provisioner
 ```
 
-Snapshots (`tracking_capture_snapshots=True`) and actors are both opt-in to keep the fast path lightweight.
+Snapshots (`tracking_capture_snapshots=True`), stack capture (`tracking_capture_stack=True`), and actors are all opt-in so the fast path stays lightweight. Enable only the knobs you need for debugging or auditing.

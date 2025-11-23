@@ -69,6 +69,7 @@ class TrackedAttr(TrackBase):
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
         tracking_capture_snapshots: bool | None = None,
+        tracking_capture_stack: bool | None = None,
     ) -> None:
         """Initialize a TrackedAttr instance.
 
@@ -95,6 +96,7 @@ class TrackedAttr(TrackBase):
             tracking_location=tracking_location,
             tracking_delimiter=".",
             tracking_capture_snapshots=tracking_capture_snapshots,
+            tracking_capture_stack=tracking_capture_stack,
         )
         self._tracking_attributes_to_monitor = []
         self._tracking_locked_attributes = []
