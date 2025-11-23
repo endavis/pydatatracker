@@ -80,3 +80,6 @@ Use `async_queue_observer` to forward change dictionaries into an `asyncio.Queue
 
 ## CLI utilities
 Use `scripts/cli.py` (or `just cli`) to emit serialized changes from a demo session or show JSONL logs via `show`.
+
+## Export pipelines
+Combine observers with exporters (e.g., `JsonLinesExporter`, `HttpExporter`) to persist changes outside of your process.

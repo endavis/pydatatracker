@@ -124,3 +124,6 @@ Benchmark results (5000 mutations, 5 runs)
 
 ## CLI
 Run `just cli` to execute the demo CLI (writes a tracked change to stdout).
+
+## Exporters
+Use builders in `pydatatracker.exporters` (e.g., `JsonLinesExporter`, `HttpExporter`, `S3Exporter`, `KafkaExporter`) to stream serialized change dicts to external systems.
