@@ -11,8 +11,8 @@
 
 ## Feature ideas
 
-- Change filtering helpers for observers (subscribe to specific actions/keys).
-- Structured JSON serialization of change logs for external systems.
-- Built-in observer registry (logging/file/HTTP).
-- Async-friendly observers.
-- CLI utilities to inspect/tail changes.
+- Structured export pipeline to send serialized changes to external sinks (HTTP/S3/Kafka).
+- Installable CLI (console entry point) for inspecting/tailing logs.
+- Observer configuration via declarative files (YAML/JSON).
+- Telemetry/metrics hooks (logging, OpenTelemetry).
+- CI benchmarks with threshold alerts.

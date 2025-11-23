@@ -83,3 +83,12 @@ Use `scripts/cli.py` (or `just cli`) to emit serialized changes from a demo sess
 
 ## Export pipelines
 Combine observers with exporters (e.g., `JsonLinesExporter`, `HttpExporter`) to persist changes outside of your process.
+
+### Config examples
+```json
+[
+  {"type": "change_collector"},
+  {"type": "json_file", "options": {"path": "tmp/change.jsonl"}}
+]
+```
+Load via `load_observers_from_json` and attach to tracked objects.

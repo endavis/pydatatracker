@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Callable, Deque, Iterable
+from importlib import import_module
+from pathlib import Path
+from typing import Any, Callable, Deque, Iterable
 import json
 import logging
-from pathlib import Path
 
+from .exporters import KafkaExporter, JsonLinesExporter, HttpExporter, S3Exporter
 from .utils.changelog import ChangeLogEntry
 
 
@@ -128,3 +130,40 @@ def async_queue_observer(queue):
             queue.put(change.to_dict())
 
     return _observer
+
+def build_observer_from_config(config: dict[str, Any]) -> Callable[[ChangeLogEntry], None]:
+    """Instantiate an observer from a config dictionary."""
+
+    config = dict(config)
+    options = config.get("options", {})
+    kind = config["type"]
+
+    if kind == "change_collector":
+        return ChangeCollector(**options)
+    if kind == "filtered":
+        base = build_observer_from_config(config["observer"])
+        return FilteredObserver(base, **options)
+    if kind == "logging":
+        logger_name = options.get("logger")
+        logger = logging.getLogger(logger_name) if logger_name else None
+        return logging_observer(logger)
+    if kind == "json_file":
+        return json_file_observer(options["path"])
+    if kind == "json_lines_exporter":
+        return JsonLinesExporter(**options)
+    if kind == "http_exporter":
+        post_callable = _resolve_callable(options["post_callable"])
+        return HttpExporter(post_callable, options["url"], **options.get("params", {}))
+    if kind == "s3_exporter":
+        client = _resolve_callable(options["client_callable"])()
+        return S3Exporter(client, bucket=options["bucket"], prefix=options.get("prefix", "changes/"))
+    if kind == "kafka_exporter":
+        producer = _resolve_callable(options["producer_callable"])()
+        return KafkaExporter(producer, topic=options["topic"])
+    raise ValueError(f"unknown observer type: {kind}")
+
+
+def _resolve_callable(path: str) -> Callable[..., Any]:
+    module, attr = path.rsplit(".", 1)
+    mod = import_module(module)
+    return getattr(mod, attr)

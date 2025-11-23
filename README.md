@@ -127,3 +127,6 @@ Run `just cli` to execute the demo CLI (writes a tracked change to stdout).
 
 ## Exporters
 Use builders in `pydatatracker.exporters` (e.g., `JsonLinesExporter`, `HttpExporter`, `S3Exporter`, `KafkaExporter`) to stream serialized change dicts to external systems.
+
+### Config-based observers
+Define observer lists in JSON and load them with `pydatatracker.config.load_observers_from_json`.
