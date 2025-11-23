@@ -58,10 +58,12 @@ def test_snapshot_mode_relative_timing() -> None:
     """Report timing difference between snapshot modes for manual inspection."""
     baseline = _measure_assignment_time(snapshot=False)
     snapshot = _measure_assignment_time(snapshot=True)
+    percent = ((snapshot - baseline) / baseline * 100) if baseline else float("inf")
 
     print(
         f"tracking_capture_snapshots timing: off={baseline:.6f}s "
-        f"on={snapshot:.6f}s ({snapshot - baseline:.6f}s delta)"
+        f"on={snapshot:.6f}s ({snapshot - baseline:.6f}s delta, "
+        f"{percent:.2f}% slower)"
     )
 
     assert snapshot >= baseline
