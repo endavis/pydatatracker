@@ -32,3 +32,9 @@
 - Document additional examples that demonstrate how tracked containers simplify
   multi-stage data workflows.
 - Provide CLI helpers for inspecting change logs or exporting history snapshots.
+
+## Observability controls
+
+- `tracking_capture_snapshots`: opt-in repr snapshots per container
+- `tracking_actor` context manager: sets the actor stored on each ChangeLogEntry without stack inspection
+- Shallow frame inspection only runs when no actor is provided

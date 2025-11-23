@@ -59,3 +59,20 @@ release.
 - Architecture notes: `docs/architecture.md`
 - Issue tracker: open issues against the upstream GitHub repository referenced in the
   project URLs.
+
+## Tracking actors
+
+Set a temporary actor when mutating tracked objects to avoid stack inspection overhead::
+
+```python
+from pydatatracker import TrackedDict
+from pydatatracker.types.actor import tracking_actor
+
+tracked = TrackedDict()
+with tracking_actor('provisioner'):
+    tracked['status'] = 'ready'
+
+print(tracked.tracking_changes()[0].actor)  # => provisioner
+```
+
+Snapshots (`tracking_capture_snapshots=True`) and actors are both opt-in to keep the fast path lightweight.
