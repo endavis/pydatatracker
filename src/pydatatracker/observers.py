@@ -61,3 +61,20 @@ class ChangeCollector:
 
     def __iter__(self) -> Iterable[ChangeLogEntry]:  # pragma: no cover
         return iter(self._changes)
+
+
+class FilteredObserver:
+    """Wraps another observer, only forwarding matching changes."""
+
+    def __init__(self, observer, *, actions=None, locations=None):
+        self.observer = observer
+        self.actions = set(actions or [])
+        self.locations = set(locations or [])
+
+    def __call__(self, change):
+        if self.actions and change.extra.get('action') not in self.actions:
+            return
+        location = change.extra.get('location')
+        if self.locations and location not in self.locations:
+            return
+        return self.observer(change)

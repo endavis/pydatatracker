@@ -8,6 +8,7 @@ import time
 import pytest
 
 from pydatatracker import TrackedDict, ChangeCollector
+from pydatatracker.observers import FilteredObserver
 
 
 def test_tracked_dict_logs_updates() -> None:
@@ -124,3 +125,20 @@ def test_change_collector_observer_records_events() -> None:
 
     collected_locations = [entry.extra["location"] for entry in collector.as_list()]
     assert "evt" in collected_locations
+
+
+def test_filtered_observer_filters_events() -> None:
+    tracked = TrackedDict()
+    collected = []
+
+    def observer(change):
+        collected.append(change.extra.get('location'))
+
+    filtered = FilteredObserver(observer, actions={'update'}, locations={'foo'})
+    tracked.tracking_add_observer(filtered)
+
+    tracked['foo'] = 1
+    tracked['bar'] = 2
+    tracked['foo'] = 3
+
+    assert collected == ['foo']

@@ -8,3 +8,12 @@
 
 ## Remaining work
 
+- Prepare packaging/docs for a release (version bump, changelog, distribution notes).
+
+## Feature ideas
+
+- Change filtering helpers for observers (subscribe to specific actions/keys).
+- Structured JSON serialization of change logs for external systems.
+- Built-in observer registry (logging/file/HTTP).
+- Async-friendly observers.
+- CLI utilities to inspect/tail changes.
