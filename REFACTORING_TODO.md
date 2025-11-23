@@ -8,7 +8,6 @@
 
 ## Remaining work
 
-- Prepare packaging/docs for a release (version bump, changelog, distribution notes).
 
 ## Feature ideas
 
