@@ -46,6 +46,7 @@ __all__ = [
     "ChangeLogEntry",
     "add_to_ignore_in_stack",
     "ChangeCollector",
+    "tracking_actor",
     "__version__",
 ]
 
@@ -55,3 +56,4 @@ from .types.trackedattributes import TrackedAttr
 from .utils.changelog import ChangeLogEntry
 from .utils.changelog import add_to_ignore_in_stack
 from .observers import ChangeCollector
+from .types.actor import tracking_actor

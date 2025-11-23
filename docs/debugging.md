@@ -2,8 +2,7 @@
 
 ## Capture actors without stack traces
 ```python
-from pydatatracker import TrackedDict
-from pydatatracker.types.actor import tracking_actor
+from pydatatracker import TrackedDict, tracking_actor
 
 payload = TrackedDict()
 with tracking_actor("importer"):

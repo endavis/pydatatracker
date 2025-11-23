@@ -66,8 +66,7 @@ release.
 Set a temporary actor when mutating tracked objects to avoid stack inspection overhead::
 
 ```python
-from pydatatracker import TrackedDict
-from pydatatracker.types.actor import tracking_actor
+from pydatatracker import TrackedDict, tracking_actor
 
 tracked = TrackedDict()
 with tracking_actor('provisioner'):
