@@ -49,3 +49,54 @@ def test_tracked_dict_child_tracks_its_own_updates() -> None:
     assert change.extra["action"] == "update"
     assert change.extra["location"] == "state"
     assert change.extra["value"] == "final"
+
+
+def test_tracked_dict_setdefault_records_default_and_return() -> None:
+    """`setdefault` tracks the provided default and the return value."""
+    tracked = TrackedDict({"a": 1})
+
+    returned = tracked.setdefault("b", 2)
+
+    change = _latest_change(tracked)
+    assert returned == 2
+    assert change.extra["action"] == "update"
+    assert change.extra["location"] == "b"
+    assert change.extra["default"] == "2"
+    assert change.extra["return_value"] == "2"
+
+
+def test_tracked_dict_update_logs_replacements() -> None:
+    """`update` notes removed values when keys are overwritten."""
+    tracked = TrackedDict({"a": 1})
+
+    tracked.update({"a": 3, "b": 2})
+
+    change = _latest_change(tracked)
+    assert change.extra["action"] == "update"
+    assert "1" in change.extra["removed_items"]
+    assert "{'a': 3" in change.extra["value"]
+    assert "'b': 2" in change.extra["value"]
+
+
+def test_tracked_dict_clear_records_removed_items() -> None:
+    """`clear` stores all removed values."""
+    tracked = TrackedDict({"a": 1, "b": 2})
+
+    tracked.clear()
+
+    change = _latest_change(tracked)
+    assert change.extra["action"] == "remove"
+    assert "[1, 2]" in change.extra["removed_items"]
+
+
+def test_tracked_dict_copy_untracked_returns_plain_dict() -> None:
+    """`copy(untracked=True)` returns regular dictionaries."""
+    tracked = TrackedDict({"a": {"nested": 1}}, tracking_auto_convert=True)
+
+    clone = tracked.copy(untracked=True)
+
+    change = _latest_change(tracked)
+    assert isinstance(clone, dict)
+    assert isinstance(clone["a"], dict)
+    assert change.extra["action"] == "copy"
+    assert change.extra["untracked"] == "True"
