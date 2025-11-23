@@ -8,9 +8,4 @@
 
 ## Remaining work
 
-- Add benchmark tooling (`just benchmark` and/or `scripts/bench.py`) to measure snapshot/stack/actor combinations.
-- Re-export `tracking_actor` from the top-level `pydatatracker` package for easier imports.
-- Polish `ChangeCollector` and consider providing additional observer utilities (logging, persistence).
-- Add more observer examples (e.g., console logger, JSON export) to documentation.
-- Integrate benchmark results (e.g., README snippet or CI artifact) so regressions are easy to spot.
 - Prepare packaging/docs for a release (version bump, changelog, distribution notes).

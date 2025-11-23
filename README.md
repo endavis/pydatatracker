@@ -112,3 +112,15 @@ def log_observer(change):
 
 tracked.tracking_add_observer(log_observer)
 ```
+
+## Benchmarks
+
+Use `just benchmark` to measure the overhead of observability features. Sample output:
+
+```
+Benchmark results (5000 mutations, 5 runs)
+  base     mean=1.05s stdev=0.03s
+  actor    mean=1.01s stdev=0.04s
+  snapshot mean=4.52s stdev=0.22s
+  full     mean=4.25s stdev=0.18s
+```

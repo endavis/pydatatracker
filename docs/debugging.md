@@ -70,3 +70,7 @@ recent = payload.changes_since(latest.created_time)
 3. Attach a `ChangeCollector` or custom observer.
 4. Re-run the workflow and inspect `collector.as_list()` or `changes_since(...)`.
 5. Disable the flags when you’re satisfied with the diagnosis.
+
+## Benchmarking observability costs
+
+Run `just benchmark` to quantify how actors, snapshots, and stack capture affect throughput. Compare modes before enabling diagnostic knobs in production.
