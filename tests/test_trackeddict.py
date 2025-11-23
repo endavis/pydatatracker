@@ -100,3 +100,18 @@ def test_tracked_dict_copy_untracked_returns_plain_dict() -> None:
     assert isinstance(clone["a"], dict)
     assert change.extra["action"] == "copy"
     assert change.extra["untracked"] == "True"
+
+
+def test_tracked_dict_snapshot_opt_in_records_repr() -> None:
+    """`tracking_capture_snapshots` controls repr logging."""
+    tracked = TrackedDict(tracking_capture_snapshots=True)
+
+    tracked["a"] = 1
+    change = tracked.tracking_changes()[-1]
+    assert "data_pre_change" in change.extra
+    assert change.extra["data_post_change"].endswith("1}")
+
+    tracked2 = TrackedDict()
+    tracked2["a"] = 1
+    change2 = tracked2.tracking_changes()[-1]
+    assert "data_pre_change" not in change2.extra

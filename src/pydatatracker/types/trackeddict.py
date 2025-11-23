@@ -71,6 +71,7 @@ class TrackedDict(TrackBase, dict):
         tracking_auto_convert: bool = False,
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
+        tracking_capture_snapshots: bool | None = None,
         **kwargs,
     ) -> None:
         """Initialize the tracked dictionary with optional tracking parameters.
@@ -90,6 +91,9 @@ class TrackedDict(TrackBase, dict):
 
         """
         dict.__init__(self, *args, **kwargs)
+        tracking_kwargs = {}
+        if tracking_capture_snapshots is not None:
+            tracking_kwargs["tracking_capture_snapshots"] = tracking_capture_snapshots
         TrackBase.__init__(
             self,
             tracking_auto_converted_in=tracking_auto_converted_in,
@@ -98,6 +102,7 @@ class TrackedDict(TrackBase, dict):
             tracking_location=tracking_location,
             tracking_name=tracking_name,
             tracking_delimiter=":",
+            **tracking_kwargs,
         )
 
     def _tracking_convert_all_values(self) -> None:

@@ -68,6 +68,7 @@ class TrackedList(TrackBase, list):
         tracking_auto_convert: bool = False,
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
+        tracking_capture_snapshots: bool | None = None,
     ) -> None:
         """Initialize the tracked list.
 
@@ -85,6 +86,9 @@ class TrackedList(TrackBase, list):
         if data is None:
             data = []
         list.__init__(self, data)
+        extra_kwargs = {}
+        if tracking_capture_snapshots is not None:
+            extra_kwargs["tracking_capture_snapshots"] = tracking_capture_snapshots
         TrackBase.__init__(
             self,
             tracking_auto_converted_in=tracking_auto_converted_in,
@@ -92,6 +96,7 @@ class TrackedList(TrackBase, list):
             tracking_parent=tracking_parent,
             tracking_location=tracking_location,
             tracking_delimiter="|",
+            **extra_kwargs,
         )
 
     def _tracking_convert_all_values(self) -> None:

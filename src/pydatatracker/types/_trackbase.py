@@ -131,7 +131,7 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
         """
         # reset the tracking context
         data_pre_change = None
-        if self._tracking_is_trackable(self) in ["TrackedDict", "TrackedList"]:
+        if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in ["TrackedDict", "TrackedList"]:
             data_pre_change = repr(self)
 
         self._tracking_context = {}
@@ -153,7 +153,7 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
                             self._tracking_notify_observers
                         )
 
-            if self._tracking_is_trackable(self) in ["TrackedDict", "TrackedList"]:
+            if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in ["TrackedDict", "TrackedList"]:
                 self._tracking_context["data_pre_change"] = data_pre_change
                 self._tracking_context["data_post_change"] = repr(self)
             self._tracking_context["method"] = method.__name__
@@ -221,6 +221,13 @@ class TrackBase:
         self._tracking_child_tracked_items = {}
         self._tracking_delimiter = tracking_delimiter
         self._tracking_debug_flag = False
+        self._tracking_capture_snapshots = kwargs.get("tracking_capture_snapshots", False)
+        if tracking_parent:
+            self._tracking_capture_snapshots = getattr(
+                tracking_parent, "_tracking_capture_snapshots", False
+            )
+        if "tracking_capture_snapshots" in kwargs:
+            self._tracking_capture_snapshots = kwargs["tracking_capture_snapshots"]
         if tracking_parent:
             tracking_parent._tracking_add_child_tracked_item(tracking_location, self)
 
