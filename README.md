@@ -130,3 +130,6 @@ Use builders in `pydatatracker.exporters` (e.g., `JsonLinesExporter`, `HttpExpor
 
 ### Config-based observers
 Define observer lists in JSON and load them with `pydatatracker.config.load_observers_from_json`.
+
+### Benchmarks in CI
+GitHub Actions runs `scripts/benchmark.py` on every push; keep average times within ~5x of the base to avoid regressions.
