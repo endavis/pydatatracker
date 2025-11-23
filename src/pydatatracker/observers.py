@@ -11,11 +11,26 @@ from .utils.changelog import ChangeLogEntry
 class ChangeCollector:
     """Callable observer that stores incoming change log entries in memory."""
 
-    def __init__(self, capacity: int | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        capacity: int | None = None,
+        include_init_events: bool = False,
+    ) -> None:
+        """Initialize the collector.
+
+        Args:
+            capacity: Optional maximum number of entries to keep (FIFO).
+            include_init_events: Whether to store container `init` events.
+        """
+
         self.capacity = capacity
+        self.include_init_events = include_init_events
         self._changes: Deque[ChangeLogEntry] = deque(maxlen=self.capacity)
 
     def __call__(self, change: ChangeLogEntry) -> None:  # pragma: no cover - trivial
+        if not self.include_init_events and change.extra.get("action") == "init":
+            return
         self._changes.append(change)
 
     def __len__(self) -> int:  # pragma: no cover - trivial
@@ -33,6 +48,16 @@ class ChangeCollector:
         """Return collected changes as a list (in arrival order)."""
 
         return list(self._changes)
+
+    def last(self) -> ChangeLogEntry | None:
+        """Return the most recent collected change."""
+
+        return self._changes[-1] if self._changes else None
+
+    def filtered(self, action: str) -> list[ChangeLogEntry]:
+        """Return collected changes matching a specific action."""
+
+        return [entry for entry in self._changes if entry.extra.get("action") == action]
 
     def __iter__(self) -> Iterable[ChangeLogEntry]:  # pragma: no cover
         return iter(self._changes)
