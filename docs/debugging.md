@@ -33,6 +33,14 @@ payload["status"] = "ready"
 print(collector.as_list())
 ```
 
+### Telemetry observer
+```python
+from pydatatracker.observers import telemetry_observer
+
+payload.tracking_add_observer(telemetry_observer())
+payload["status"] = "ready"
+```
+
 ### Log observer
 ```python
 import logging
