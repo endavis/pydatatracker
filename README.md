@@ -107,7 +107,7 @@ tracked["mode"] = "debug"
 print(collector.as_list()[-1].extra["location"])  # mode
 ```
 
-You can also register async-friendly observers using `async_queue_observer` to push changes onto an `asyncio.Queue`.
+You can also register async-friendly observers using `async_queue_observer` to push changes onto an `asyncio.Queue`. For metrics, wrap a Prometheus (or compatible) counter via `telemetry_observer()` to increment labels per action.
 
 
 ## Benchmarks

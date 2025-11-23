@@ -167,3 +167,36 @@ def _resolve_callable(path: str) -> Callable[..., Any]:
     module, attr = path.rsplit(".", 1)
     mod = import_module(module)
     return getattr(mod, attr)
+
+class MetricsObserver:
+    def __init__(self, counter):
+        self.counter = counter
+
+    def __call__(self, change):
+        key = change.extra.get('action', 'unknown')
+        self.counter.labels(action=key).inc()
+
+
+class MetricsObserver:
+    """Simple metrics observer wrapping a Counter-like interface."""
+
+    def __init__(self, counter: Any) -> None:
+        self.counter = counter
+
+    def __call__(self, change: ChangeLogEntry) -> None:
+        action = change.extra.get("action", "unknown")
+        self.counter.labels(action=action).inc()
+
+
+def telemetry_observer(counter: Any | None = None) -> MetricsObserver:
+    """Return an observer that increments a Counter per action."""
+
+    if counter is None:
+        try:
+            from prometheus_client import Counter  # type: ignore
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError(
+                "Install prometheus_client or pass an existing counter"
+            ) from exc
+        counter = Counter("pydatatracker_changes", "Total changes", ["action"])
+    return MetricsObserver(counter)
