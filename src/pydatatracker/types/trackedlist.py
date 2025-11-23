@@ -465,7 +465,7 @@ class TrackedList(TrackBase, list):
 
     @check_lock
     @track_changes
-    def copy(self, untracked: bool = True) -> list[Any] | "TrackedList":
+    def copy(self, untracked: bool = True) -> "list[Any] | TrackedList":
         """Copy the tracked list.
 
         This method creates a copy of the tracked list. If `untracked` is True,
