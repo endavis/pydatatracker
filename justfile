@@ -37,3 +37,6 @@ build:
 publish:
 	uv build
 	PYPI_TOKEN=${PYPI_TOKEN:?set PYPI_TOKEN} uv publish --token "$PYPI_TOKEN"
+
+cli:
+	uv run python scripts/cli.py demo

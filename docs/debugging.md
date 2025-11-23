@@ -77,3 +77,6 @@ Run `just benchmark` to quantify how actors, snapshots, and stack capture affect
 
 ## Async observers
 Use `async_queue_observer` to forward change dictionaries into an `asyncio.Queue` while continuing to operate in synchronous contexts.
+
+## CLI utilities
+Use `scripts/cli.py` (or `just cli`) to emit serialized changes from a demo session or show JSONL logs via `show`.

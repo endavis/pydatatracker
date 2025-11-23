@@ -121,3 +121,6 @@ Benchmark results (5000 mutations, 5 runs)
   snapshot mean=4.52s stdev=0.22s
   full     mean=4.25s stdev=0.18s
 ```
+
+## CLI
+Run `just cli` to execute the demo CLI (writes a tracked change to stdout).
