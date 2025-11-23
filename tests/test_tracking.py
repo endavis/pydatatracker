@@ -7,7 +7,10 @@ import time
 
 import pytest
 
+import logging
+
 from pydatatracker import TrackedDict, ChangeCollector
+from pydatatracker.observers import logging_observer, json_file_observer
 from pydatatracker.observers import FilteredObserver
 
 
@@ -153,3 +156,27 @@ def test_change_log_entry_to_dict() -> None:
     assert serialized['extra']['location'] == 'count'
     assert 'actor' in serialized
     assert serialized['created_time'].endswith('Z') or serialized['created_time'].count(':') >= 2
+
+
+def test_json_file_observer_writes_changes(tmp_path) -> None:
+    tracked = TrackedDict()
+    file_path = tmp_path / 'log.jsonl'
+
+    observer = json_file_observer(file_path)
+    tracked.tracking_add_observer(observer)
+    tracked['foo'] = 'bar'
+
+    lines = file_path.read_text().strip().splitlines()
+    assert len(lines) == 1
+    assert 'foo' in lines[0]
+
+def test_logging_observer_uses_logger(caplog) -> None:
+    tracked = TrackedDict()
+    logger = logging.getLogger('pydatatracker.tests')
+    observer = logging_observer(logger)
+    tracked.tracking_add_observer(observer)
+
+    with caplog.at_level(logging.INFO):
+        tracked['foo'] = 'bar'
+
+    assert any('foo' in record.message for record in caplog.records)

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Deque, Iterable
+from typing import Callable, Deque, Iterable
+import json
+import logging
+from pathlib import Path
 
 from .utils.changelog import ChangeLogEntry
 
@@ -81,3 +84,32 @@ class FilteredObserver:
 
 def filtered_observer(observer, *, actions=None, locations=None):
     return FilteredObserver(observer, actions=actions, locations=locations)
+
+
+def logging_observer(logger: logging.Logger | None = None) -> Callable[[ChangeLogEntry], None]:
+    """Create an observer that logs changes via the provided logger."""
+
+    logger = logger or logging.getLogger("pydatatracker")
+
+    def _observer(change: ChangeLogEntry) -> None:
+        logger.info(
+            "change %s action=%s location=%s",
+            change.tracked_item_uuid,
+            change.extra.get("action"),
+            change.extra.get("location"),
+        )
+
+    return _observer
+
+
+def json_file_observer(path: str | Path) -> Callable[[ChangeLogEntry], None]:
+    """Return an observer that appends serialized changes to a .jsonl file."""
+
+    file_path = Path(path)
+
+    def _observer(change: ChangeLogEntry) -> None:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with file_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(change.to_dict()) + "\n")
+
+    return _observer
