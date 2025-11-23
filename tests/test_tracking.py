@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import time
 
 import pytest
@@ -91,3 +92,23 @@ def test_tracking_changes_preserve_insertion_order() -> None:
     last_two = tracked.tracking_changes()[-2:]
     assert [entry.extra["location"] for entry in last_two] == ["first", "second"]
     assert last_two[0].created_time <= last_two[1].created_time
+
+
+def test_last_change_and_changes_since() -> None:
+    tracked = TrackedDict()
+    initial = tracked.last_change()
+    assert initial is not None
+    assert initial.extra["action"] == "init"
+
+    tracked["alpha"] = 1
+    first_entry = tracked.last_change()
+    assert first_entry is not None
+    assert first_entry.extra["location"] == "alpha"
+
+    tracked["beta"] = 2
+    all_changes = tracked.changes_since(first_entry)
+    assert [entry.extra["location"] for entry in all_changes] == ["alpha", "beta"]
+
+    cutoff = first_entry.created_time + datetime.timedelta(microseconds=1)
+    recent_changes = tracked.changes_since(cutoff)
+    assert [entry.extra["location"] for entry in recent_changes] == ["beta"]

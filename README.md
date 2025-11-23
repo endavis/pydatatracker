@@ -76,3 +76,12 @@ print(tracked.tracking_changes()[0].actor)  # => provisioner
 ```
 
 Snapshots (`tracking_capture_snapshots=True`), stack capture (`tracking_capture_stack=True`), and actors are all opt-in so the fast path stays lightweight. Enable only the knobs you need for debugging or auditing.
+
+## Inspecting change history
+
+Each tracked object exposes `tracking_changes()`, `last_change()`, and `changes_since(...)` so callers can safely inspect audit history without dipping into private attributes. For example:
+
+```python
+changes = tracked.changes_since(first_change)
+print([entry.extra["location"] for entry in changes])
+```

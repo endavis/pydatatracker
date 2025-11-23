@@ -407,6 +407,30 @@ class TrackBase:
             return []
         return list(self._tracking_changes[-most_recent:])
 
+    def last_change(self) -> ChangeLogEntry | None:
+        """Return the most recent change or None if no changes exist."""
+        return self._tracking_changes[-1] if self._tracking_changes else None
+
+    def changes_since(
+        self, since: datetime.datetime | ChangeLogEntry | None
+    ) -> list[ChangeLogEntry]:
+        """Return changes occurring at or after the provided timestamp.
+
+        Args:
+            since: Datetime or ChangeLogEntry whose timestamp defines the lower bound.
+                When None, returns all changes.
+
+        Returns:
+            A list of changes ordered chronologically.
+
+        """
+        if since is None:
+            return list(self._tracking_changes)
+        threshold = (
+            since.created_time if isinstance(since, ChangeLogEntry) else since
+        )
+        return [entry for entry in self._tracking_changes if entry.created_time >= threshold]
+
     def _tracking_notify_observers(self, change_log_entry: ChangeLogEntry) -> None:
         """Notify all observers of changes to a tracked object.
 

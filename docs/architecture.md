@@ -39,3 +39,4 @@
 - `tracking_capture_stack`: opt-in stack/actor inference for debugging
 - `tracking_actor` context manager: sets the actor stored on each ChangeLogEntry without stack inspection
 - Shallow frame inspection only runs when both snapshot and stack capture are disabled
+- Consumers should rely on `last_change()` and `changes_since()` when inspecting history.
