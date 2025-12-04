@@ -26,6 +26,6 @@ jobs:
       - name: Show build artifacts
         run: ls -lah dist
       - name: Publish to TestPyPI
-        run: uv publish --repository-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN"
+        run: uv publish --index-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN"
         env:
           TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
