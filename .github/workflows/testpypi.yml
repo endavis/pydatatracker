@@ -25,7 +25,15 @@ jobs:
         run: uv build
       - name: Show build artifacts
         run: ls -lah dist
+      - name: Validate TestPyPI token is present
+        run: |
+          if [ -z "${TEST_PYPI_TOKEN:-}" ]; then
+            echo "TEST_PYPI_TOKEN is not set in the testpypi environment." >&2
+            exit 1
+          fi
+        env:
+          TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
       - name: Publish to TestPyPI
-        run: uv publish --index-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN"
+        run: uv publish --index-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN" dist/*
         env:
           TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
