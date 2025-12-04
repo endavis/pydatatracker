@@ -39,6 +39,7 @@ Classes:
     - `TrackedDict`: Represents a class that can track dictionary changes.
 
 """
+
 # Standard Library
 from collections.abc import Hashable
 from typing import TYPE_CHECKING, Any
@@ -134,24 +135,22 @@ class TrackedDict(TrackBase, dict):
             change_log_entry.tracked_item_uuid != self._tracking_uuid
             and change_log_entry.tracked_item_uuid in self._tracking_child_tracked_items
         ):
-            new_change = change_log_entry.copy(
-                change_log_entry.extra["type"], self._tracking_uuid
-            )
+            new_change = change_log_entry.copy(change_log_entry.extra["type"], self._tracking_uuid)
             new_change.add_to_tree(
                 self._tracking_format_tree_location(
-                    self._tracking_child_tracked_items[
-                        change_log_entry.tracked_item_uuid
-                    ]["location"]
+                    self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid][
+                        "location"
+                    ]
                 )
             )
 
             if "location" in new_change.extra:
-                delimiter = self._tracking_child_tracked_items[
-                    change_log_entry.tracked_item_uuid
-                ]["item"]._tracking_delimiter
-                location = self._tracking_child_tracked_items[
-                    change_log_entry.tracked_item_uuid
-                ]["location"]
+                delimiter = self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid][
+                    "item"
+                ]._tracking_delimiter
+                location = self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid][
+                    "location"
+                ]
                 new_change.extra["location"] = (
                     f"{location}{delimiter}{new_change.extra['location']}"
                 )
@@ -159,7 +158,7 @@ class TrackedDict(TrackBase, dict):
                 tracked_item = self._tracking_child_tracked_items[
                     change_log_entry.tracked_item_uuid
                 ]
-                new_change.extra["location"] = f'{tracked_item["location"]}'
+                new_change.extra["location"] = f"{tracked_item['location']}"
             change_log_entry = new_change
 
         if change_log_entry not in self._tracking_changes:
@@ -401,9 +400,7 @@ class TrackedDict(TrackBase, dict):
         """
         if not self._tracking_locked:
             for item in self:
-                self._tracking_context.setdefault("removed_items", []).append(
-                    self[item]
-                )
+                self._tracking_context.setdefault("removed_items", []).append(self[item])
 
             super().clear()
 
@@ -432,9 +429,7 @@ class TrackedDict(TrackBase, dict):
             >>> untracked_copy = tracked.copy(untracked=True) # Create an untracked copy
 
         """
-        new_object = (
-            self._tracking_convert_to_untrackable(self) if untracked else super().copy()
-        )
+        new_object = self._tracking_convert_to_untrackable(self) if untracked else super().copy()
         self._tracking_context["action"] = "copy"
         self._tracking_context["untracked"] = untracked
         return new_object
@@ -462,9 +457,7 @@ class TrackedDict(TrackBase, dict):
         known_uuids: list[str] = []
         if level == 0:
             emptybar[level] = True
-            known_uuids.append(
-                f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}"
-            )
+            known_uuids.append(f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}")
             level += 1
         emptybar[level] = False
         pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))

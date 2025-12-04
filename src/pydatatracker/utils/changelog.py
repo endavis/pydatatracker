@@ -35,6 +35,7 @@ Classes:
     ChangeLogEntry: Main class for tracking individual changes
 
 """
+
 # Standard Library
 import ast
 import datetime
@@ -140,7 +141,7 @@ class ChangeLogEntry:
             code = frame.f_code
             filename = code.co_filename
             if not any(ignore in filename for ignore in _IGNORE_IN_STACK):
-                return f"File \"{filename}\", line {frame.f_lineno}, in {code.co_name}"
+                return f'File "{filename}", line {frame.f_lineno}, in {code.co_name}'
             frame = frame.f_back
         return ""
 
@@ -172,9 +173,7 @@ class ChangeLogEntry:
             A formatted string representing the ChangeLogEntry instance
 
         """
-        return (
-            f"ChangeLogEntry: {self.created_time} {self.tracked_item_uuid} {self.extra}"
-        )
+        return f"ChangeLogEntry: {self.created_time} {self.tracked_item_uuid} {self.extra}"
 
     def __eq__(self, value: object) -> bool:
         """Compare this ChangeLogEntry with another for equality.
@@ -234,9 +233,7 @@ class ChangeLogEntry:
         new_log.tree = self.tree
         return new_log
 
-    def format_detailed(
-        self, show_stack: bool = False, data_lines_to_show: int = 10
-    ) -> list[str]:
+    def format_detailed(self, show_stack: bool = False, data_lines_to_show: int = 10) -> list[str]:
         r"""Generate a detailed formatted representation of the change entry.
 
         Creates a list of formatted strings containing all relevant information about
@@ -311,13 +308,13 @@ class ChangeLogEntry:
     def to_dict(self) -> dict[str, object]:
         """Serialize the change log entry to a JSON-friendly dict."""
         return {
-            'uuid': self.uuid,
-            'tracked_item_uuid': self.tracked_item_uuid,
-            'created_time': self.created_time.isoformat(),
-            'actor': self.actor,
-            'stack': self.stack,
-            'tree': self.tree,
-            'extra': self.extra.copy(),
+            "uuid": self.uuid,
+            "tracked_item_uuid": self.tracked_item_uuid,
+            "created_time": self.created_time.isoformat(),
+            "actor": self.actor,
+            "stack": self.stack,
+            "tree": self.tree,
+            "extra": self.extra.copy(),
         }
 
     def format_data(self, name: str, data_lines_to_show: int) -> list[str]:

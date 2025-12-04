@@ -78,12 +78,13 @@ class FilteredObserver:
         self.locations = set(locations or [])
 
     def __call__(self, change):
-        if self.actions and change.extra.get('action') not in self.actions:
+        if self.actions and change.extra.get("action") not in self.actions:
             return
-        location = change.extra.get('location')
+        location = change.extra.get("location")
         if self.locations and location not in self.locations:
             return
         return self.observer(change)
+
 
 def filtered_observer(observer, *, actions=None, locations=None):
     return FilteredObserver(observer, actions=actions, locations=locations)
@@ -132,6 +133,7 @@ def async_queue_observer(queue):
 
     return _observer
 
+
 def build_observer_from_config(config: dict[str, Any]) -> Callable[[ChangeLogEntry], None]:
     """Instantiate an observer from a config dictionary."""
 
@@ -173,6 +175,7 @@ def _resolve_callable(path: str) -> Callable[..., Any]:
     mod = import_module(module)
     return getattr(mod, attr)
 
+
 class MetricsObserver:
     """Simple metrics observer wrapping a Counter-like interface."""
 
@@ -191,8 +194,6 @@ def telemetry_observer(counter: Any | None = None) -> MetricsObserver:
         try:
             from prometheus_client import Counter  # type: ignore
         except ImportError as exc:  # pragma: no cover
-            raise RuntimeError(
-                "Install prometheus_client or pass an existing counter"
-            ) from exc
+            raise RuntimeError("Install prometheus_client or pass an existing counter") from exc
         counter = Counter("pydatatracker_changes", "Total changes", ["action"])
     return MetricsObserver(counter)

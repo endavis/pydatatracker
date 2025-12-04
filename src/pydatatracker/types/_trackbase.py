@@ -40,6 +40,7 @@ Classes:
     - `TrackBase`: Represents a class that can track object changes.
 
 """
+
 # Standard Library
 import datetime
 import logging
@@ -87,9 +88,7 @@ def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
 
         """
         if hasattr(self, "_tracking_locked") and self._tracking_locked:
-            raise RuntimeError(
-                f"{self.__class__.__name__} is locked and cannot be modified."
-            )
+            raise RuntimeError(f"{self.__class__.__name__} is locked and cannot be modified.")
         return method(self, *args, **kwargs)
 
     return wrapper
@@ -144,21 +143,17 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
 
         # Check if the object has a tracking_context attribute (for tracking changes)
         if self._tracking_context and "action" in self._tracking_context:
-
             if "removed_items" in self._tracking_context:
                 for olditem in self._tracking_context["removed_items"]:
                     if self._tracking_is_trackable(olditem):
                         if olditem._tracking_uuid in self._tracking_child_tracked_items:
-                            del self._tracking_child_tracked_items[
-                                olditem._tracking_uuid
-                            ]
-                        olditem.tracking_remove_observer(
-                            self._tracking_notify_observers
-                        )
+                            del self._tracking_child_tracked_items[olditem._tracking_uuid]
+                        olditem.tracking_remove_observer(self._tracking_notify_observers)
 
-            if self._tracking_capture_snapshots and self._tracking_is_trackable(
-                self
-            ) in ["TrackedDict", "TrackedList"]:
+            if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in [
+                "TrackedDict",
+                "TrackedList",
+            ]:
                 self._tracking_context["data_pre_change"] = data_pre_change
                 self._tracking_context["data_post_change"] = repr(self)
             self._tracking_context["method"] = method.__name__
@@ -169,6 +164,7 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
         return result
 
     return wrapper
+
 
 class TrackBase:
     """Base class for tracking changes to objects.
@@ -286,9 +282,7 @@ class TrackBase:
 
         """
         if self._tracking_debug_flag:
-            logging.info(
-                f"{self._tracking_uuid[:4]}..{self._tracking_uuid[-4:]} - {message}"
-            )
+            logging.info(f"{self._tracking_uuid[:4]}..{self._tracking_uuid[-4:]} - {message}")
 
     def _tracking_add_child_tracked_item(
         self, location: str | None, trackable_item: "TrackBase"
@@ -430,9 +424,7 @@ class TrackBase:
         """
         if since is None:
             return list(self._tracking_changes)
-        threshold = (
-            since.created_time if isinstance(since, ChangeLogEntry) else since
-        )
+        threshold = since.created_time if isinstance(since, ChangeLogEntry) else since
         return [entry for entry in self._tracking_changes if entry.created_time >= threshold]
 
     def _tracking_notify_observers(self, change_log_entry: ChangeLogEntry) -> None:
@@ -483,9 +475,7 @@ class TrackBase:
             **kwargs,
         )
         change_log_entry.add_to_tree(
-            self._tracking_format_tree_location(
-                change_log_entry.extra.get("location", None)
-            )
+            self._tracking_format_tree_location(change_log_entry.extra.get("location", None))
         )
         self._tracking_changes.append(change_log_entry)
         self._tracking_notify_observers(change_log_entry)
@@ -631,12 +621,7 @@ class TrackBase:
 
     def _tracking_is_trackable(
         self, obj: Any
-    ) -> (
-        Literal["TrackedDict"]
-        | Literal["TrackedList"]
-        | Literal["TrackedAttr"]
-        | Literal[""]
-    ):
+    ) -> Literal["TrackedDict"] | Literal["TrackedList"] | Literal["TrackedAttr"] | Literal[""]:
         """Check if an object is trackable.
 
         This method determines if the provided object is an instance of a trackable
@@ -685,10 +670,7 @@ class TrackBase:
 
         if self._tracking_is_trackable(obj):
             if isinstance(obj, TrackedDict):
-                return {
-                    item: self._tracking_convert_to_untrackable(obj[item])
-                    for item in obj
-                }
+                return {item: self._tracking_convert_to_untrackable(obj[item]) for item in obj}
             if isinstance(obj, TrackedList):
                 return [self._tracking_convert_to_untrackable(item) for item in obj]
         return obj

@@ -128,26 +128,24 @@ class TrackedList(TrackBase, list):
             change_log_entry.tracked_item_uuid != self._tracking_uuid
             and change_log_entry.tracked_item_uuid in self._tracking_child_tracked_items
         ):
-            new_change = change_log_entry.copy(
-                change_log_entry.extra["type"], self._tracking_uuid
-            )
+            new_change = change_log_entry.copy(change_log_entry.extra["type"], self._tracking_uuid)
             new_change.add_to_tree(
                 self._tracking_format_tree_location(
-                    self._tracking_child_tracked_items[
-                        change_log_entry.tracked_item_uuid
-                    ]["location"]
+                    self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid][
+                        "location"
+                    ]
                 )
             )
             if "location" in new_change.extra:
-                delimiter = self._tracking_child_tracked_items[
-                    change_log_entry.tracked_item_uuid
-                ]["item"]._tracking_delimiter
+                delimiter = self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid][
+                    "item"
+                ]._tracking_delimiter
                 new_change.extra["location"] = (
-                    f'{self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid]["location"]}{delimiter}{new_change.extra['location']}'
+                    f"{self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid]['location']}{delimiter}{new_change.extra['location']}"
                 )
             else:
                 new_change.extra["location"] = (
-                    f'{self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid]["location"]}'
+                    f"{self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid]['location']}"
                 )
 
             change_log_entry = new_change
@@ -284,10 +282,7 @@ class TrackedList(TrackBase, list):
         extend_length = len(new_data)
         current_leng = len(self)
 
-        locations = [
-            str(i - 1)
-            for i in range(current_leng - 1, current_leng - 1 + extend_length)
-        ]
+        locations = [str(i - 1) for i in range(current_leng - 1, current_leng - 1 + extend_length)]
         location = ",".join(locations)
 
         self._tracking_context["action"] = "add"
@@ -395,9 +390,7 @@ class TrackedList(TrackBase, list):
         if item != "###^$^@$^$default###^$^@$^":
             self._tracking_context.setdefault("removed_items", []).append(item)
         self._tracking_context["action"] = "remove"
-        self._tracking_context["value"] = (
-            None if item == "###^$^@$^$default###^$^@$^" else item
-        )
+        self._tracking_context["value"] = None if item == "###^$^@$^$default###^$^@$^" else item
         self._tracking_context["location"] = actual_index
         self._tracking_context["passed_index"] = passed_index
 
@@ -491,9 +484,7 @@ class TrackedList(TrackBase, list):
             >>> new_untracked_list = tracked_list.copy(untracked=True)  # Untracked copy
 
         """
-        new_data = (
-            self._tracking_convert_to_untrackable(self) if untracked else super().copy()
-        )
+        new_data = self._tracking_convert_to_untrackable(self) if untracked else super().copy()
         self._tracking_context["action"] = "copy"
         return new_data
 
@@ -520,9 +511,7 @@ class TrackedList(TrackBase, list):
         known_uuids: list[str] = []
         if level == 0:
             emptybar[level] = True
-            known_uuids.append(
-                f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}"
-            )
+            known_uuids.append(f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}")
             level += 1
         emptybar[level] = False
         pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))
@@ -560,9 +549,7 @@ class TrackedList(TrackBase, list):
                     f"{pre_string} |-> Location: [{self.index(item)}] "
                     f"Item: {self._tracking_is_trackable(item)}:{item._tracking_uuid}"
                 )
-                known_uuids.extend(
-                    item._tracking_known_uuids_tree(level + 1, emptybar=emptybar)
-                )
+                known_uuids.extend(item._tracking_known_uuids_tree(level + 1, emptybar=emptybar))
 
     def _tracking_format_tree_location(self, location: str | int | None = None) -> dict:
         """Format the tree location for tracking purposes.

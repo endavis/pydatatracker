@@ -37,6 +37,7 @@ Classes:
     - `TrackedAttr`: Represents a class that can track attribute changes.
 
 """
+
 # Standard Library
 import contextlib
 import sys
@@ -412,8 +413,7 @@ class TrackedAttr(TrackBase):
         """
         if self._tracking_is_locked_attribute(attribute_name):
             raise RuntimeError(
-                f"{self.__class__.__name__}.{attribute_name} is locked and cannot be "
-                "modified."
+                f"{self.__class__.__name__}.{attribute_name} is locked and cannot be modified."
             )
 
         try:
@@ -459,31 +459,23 @@ class TrackedAttr(TrackBase):
         known_uuids = []
         if level == 0:
             emptybar[level] = True
-            known_uuids.append(
-                f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}"
-            )
+            known_uuids.append(f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}")
             level += 1
         if attribute_name:
             emptybar[level] = True
-            pre_string = "".join(
-                "    " if emptybar[i] else " |  " for i in range(level)
-            )
+            pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))
             value = getattr(self, attribute_name)
             known_uuids.append(
                 f"{pre_string} |-> Location: {attribute_name} Item: "
                 f"{self._tracking_is_trackable(value)}:{value._tracking_uuid}"
             )
 
-            known_uuids.extend(
-                value._tracking_known_uuids_tree(level + 1, emptybar=emptybar)
-            )
+            known_uuids.extend(value._tracking_known_uuids_tree(level + 1, emptybar=emptybar))
 
         else:
             emptybar[level] = False
             left = self._tracking_attributes_to_monitor[:]
-            pre_string = "".join(
-                "    " if emptybar[i] else " |  " for i in range(level)
-            )
+            pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))
             for attribute_name in self._tracking_attributes_to_monitor:
                 left.remove(attribute_name)
                 if not left:
@@ -500,9 +492,7 @@ class TrackedAttr(TrackBase):
                     )
         return known_uuids
 
-    def _tracking_format_tree_location(
-        self, location: str | None = None
-    ) -> dict[str, str]:
+    def _tracking_format_tree_location(self, location: str | None = None) -> dict[str, str]:
         """Format the tree location for a tracked attribute.
 
         This method constructs a dictionary that represents the type, UUID, and

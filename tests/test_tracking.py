@@ -138,51 +138,52 @@ def test_filtered_observer_filters_events() -> None:
     collected = []
 
     def observer(change):
-        collected.append(change.extra.get('location'))
+        collected.append(change.extra.get("location"))
 
-    filtered = FilteredObserver(observer, actions={'update'}, locations={'foo'})
+    filtered = FilteredObserver(observer, actions={"update"}, locations={"foo"})
     tracked.tracking_add_observer(filtered)
 
-    tracked['foo'] = 1
-    tracked['bar'] = 2
-    tracked['foo'] = 3
+    tracked["foo"] = 1
+    tracked["bar"] = 2
+    tracked["foo"] = 3
 
-    assert collected == ['foo']
+    assert collected == ["foo"]
 
 
 def test_change_log_entry_to_dict() -> None:
     tracked = TrackedDict()
-    tracked['count'] = 1
+    tracked["count"] = 1
     entry = tracked.last_change()
     assert entry is not None
     serialized = entry.to_dict()
-    assert serialized['extra']['location'] == 'count'
-    assert 'actor' in serialized
-    assert serialized['created_time'].endswith('Z') or serialized['created_time'].count(':') >= 2
+    assert serialized["extra"]["location"] == "count"
+    assert "actor" in serialized
+    assert serialized["created_time"].endswith("Z") or serialized["created_time"].count(":") >= 2
 
 
 def test_json_file_observer_writes_changes(tmp_path) -> None:
     tracked = TrackedDict()
-    file_path = tmp_path / 'log.jsonl'
+    file_path = tmp_path / "log.jsonl"
 
     observer = json_file_observer(file_path)
     tracked.tracking_add_observer(observer)
-    tracked['foo'] = 'bar'
+    tracked["foo"] = "bar"
 
     lines = file_path.read_text().strip().splitlines()
     assert len(lines) == 1
-    assert 'foo' in lines[0]
+    assert "foo" in lines[0]
+
 
 def test_logging_observer_uses_logger(caplog) -> None:
     tracked = TrackedDict()
-    logger = logging.getLogger('pydatatracker.tests')
+    logger = logging.getLogger("pydatatracker.tests")
     observer = logging_observer(logger)
     tracked.tracking_add_observer(observer)
 
     with caplog.at_level(logging.INFO):
-        tracked['foo'] = 'bar'
+        tracked["foo"] = "bar"
 
-    assert any('foo' in record.message for record in caplog.records)
+    assert any("foo" in record.message for record in caplog.records)
 
 
 def test_async_queue_observer_handles_coroutines():
@@ -191,6 +192,7 @@ def test_async_queue_observer_handles_coroutines():
     class DummyQueue:
         def __init__(self):
             self.items = []
+
         def put(self, value):
             self.items.append(value)
 
@@ -198,18 +200,22 @@ def test_async_queue_observer_handles_coroutines():
     observer = async_queue_observer(queue)
     tracked.tracking_add_observer(observer)
 
-    tracked['foo'] = 'bar'
+    tracked["foo"] = "bar"
     assert queue.items
+
 
 def test_async_queue_observer_synchronous_queue():
     tracked = TrackedDict()
+
     class SyncQueue:
         def __init__(self):
             self.items = []
+
         def put(self, value):
             self.items.append(value)
+
     queue = SyncQueue()
     observer = async_queue_observer(queue)
     tracked.tracking_add_observer(observer)
-    tracked['foo'] = 'bar'
+    tracked["foo"] = "bar"
     assert queue.items
