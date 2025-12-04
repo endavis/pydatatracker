@@ -5,14 +5,11 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
-  publish:
-    name: Publish to TestPyPI
+  build:
     runs-on: ubuntu-latest
-    environment: testpypi
-    env:
-      UV_CACHE_DIR: /tmp/uv-cache
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,17 +20,27 @@ jobs:
           version: "latest"
       - name: Build artifacts
         run: uv build
-      - name: Show build artifacts
-        run: ls -lah dist
-      - name: Validate TestPyPI token is present
-        run: |
-          if [ -z "${TEST_PYPI_TOKEN:-}" ]; then
-            echo "TEST_PYPI_TOKEN is not set in the testpypi environment." >&2
-            exit 1
-          fi
-        env:
-          TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
       - name: Publish to TestPyPI
-        run: uv publish --index-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN" dist/*
-        env:
-          TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist
+          skip-existing: true
