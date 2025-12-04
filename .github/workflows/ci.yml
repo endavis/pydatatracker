@@ -14,6 +14,6 @@ jobs:
         with:
           version: "latest"
       - name: Install dependencies
-        run: uv sync --dev --package pytest
+        run: uv sync --dev --extra dev
       - run: uv run pytest
       - run: uv run python scripts/benchmark.py
