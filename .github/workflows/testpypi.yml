@@ -1,0 +1,28 @@
+name: Publish to TestPyPI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to TestPyPI
+    runs-on: ubuntu-latest
+    environment: testpypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v1
+      - name: Build artifacts
+        run: uv build
+        env:
+          UV_CACHE_DIR: .uv-cache
+      - name: Publish to TestPyPI
+        run: uv publish --repository-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN"
+        env:
+          TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+          UV_CACHE_DIR: .uv-cache
