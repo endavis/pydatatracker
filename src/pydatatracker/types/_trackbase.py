@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Project: bastproxy
 # Filename: pydatatracker/types/_trackbase.py
 #
@@ -42,14 +41,14 @@ Classes:
 
 """
 # Standard Library
-from typing import Any, Callable, Literal
-from uuid import uuid4
-from functools import wraps
 import datetime
 import logging
+from collections.abc import Callable
+from functools import wraps
+from typing import Any, Literal
+from uuid import uuid4
 
 # 3rd Party
-
 # Project
 from ..utils.changelog import ChangeLogEntry
 from .actor import current_actor
@@ -132,7 +131,10 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
         """
         # reset the tracking context
         data_pre_change = None
-        if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in ["TrackedDict", "TrackedList"]:
+        if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in [
+            "TrackedDict",
+            "TrackedList",
+        ]:
             data_pre_change = repr(self)
 
         self._tracking_context = {}
@@ -154,7 +156,9 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
                             self._tracking_notify_observers
                         )
 
-            if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in ["TrackedDict", "TrackedList"]:
+            if self._tracking_capture_snapshots and self._tracking_is_trackable(
+                self
+            ) in ["TrackedDict", "TrackedList"]:
                 self._tracking_context["data_pre_change"] = data_pre_change
                 self._tracking_context["data_post_change"] = repr(self)
             self._tracking_context["method"] = method.__name__
@@ -648,9 +652,9 @@ class TrackBase:
             if the object is not trackable.
 
         """
+        from .trackedattributes import TrackedAttr
         from .trackeddict import TrackedDict
         from .trackedlist import TrackedList
-        from .trackedattributes import TrackedAttr
 
         if isinstance(obj, TrackedDict):
             return "TrackedDict"

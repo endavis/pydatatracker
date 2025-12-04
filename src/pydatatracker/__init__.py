@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Project: bastproxy
 # Filename: pydatatracker/__init__.py
 #
@@ -36,8 +35,8 @@ Classes:
     - `TrackedAttr`: Represents a class that can track attribute changes.
 """
 # imported to prevent circular references
-from .types._trackbase import TrackBase  # noqa: F401
 from ._version import __version__
+from .types._trackbase import TrackBase  # noqa: F401
 
 __all__ = [
     "TrackedDict",
@@ -50,10 +49,9 @@ __all__ = [
     "__version__",
 ]
 
-from .types.trackeddict import TrackedDict
-from .types.trackedlist import TrackedList
-from .types.trackedattributes import TrackedAttr
-from .utils.changelog import ChangeLogEntry
-from .utils.changelog import add_to_ignore_in_stack
 from .observers import ChangeCollector
 from .types.actor import tracking_actor
+from .types.trackedattributes import TrackedAttr
+from .types.trackeddict import TrackedDict
+from .types.trackedlist import TrackedList
+from .utils.changelog import ChangeLogEntry, add_to_ignore_in_stack

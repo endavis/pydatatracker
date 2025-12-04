@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Project: bastproxy
 # Filename: pydatatracker/utils/changelog.py
 #
@@ -37,10 +36,10 @@ Classes:
 
 """
 # Standard Library
+import ast
 import datetime
 import inspect
 import pprint
-import ast
 from uuid import uuid4
 
 # 3rd Party
@@ -115,7 +114,7 @@ class ChangeLogEntry:
         self.tracked_item_uuid = item_uuid
         self.extra = kwargs
         self.header_column_width = 17
-        self.created_time = datetime.datetime.now(datetime.timezone.utc)
+        self.created_time = datetime.datetime.now(datetime.UTC)
         actor = self.extra.pop("actor", None)
         if capture_stack and actor is None:
             self.stack = self.get_stack()
@@ -155,7 +154,8 @@ class ChangeLogEntry:
         depth = 0
         while frame and depth < 25:
             stack.append(
-                f'File "{frame.f_code.co_filename}", line {frame.f_lineno}, in {frame.f_code.co_name}'
+                f'File "{frame.f_code.co_filename}", '
+                f"line {frame.f_lineno}, in {frame.f_code.co_name}"
             )
             frame = frame.f_back
             depth += 1

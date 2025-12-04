@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from .utils.changelog import ChangeLogEntry
 

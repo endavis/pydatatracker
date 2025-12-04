@@ -1,6 +1,7 @@
 from pydatatracker import TrackedDict
 from pydatatracker.observers import telemetry_observer
 
+
 class DummyCounter:
     def __init__(self):
         self.counts = {}

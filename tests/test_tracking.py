@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import time
 
 import pytest
 
-import logging
-
-from pydatatracker import TrackedDict, ChangeCollector
-from pydatatracker.observers import logging_observer, json_file_observer, async_queue_observer
-from pydatatracker.observers import FilteredObserver
+from pydatatracker import ChangeCollector, TrackedDict
+from pydatatracker.observers import (
+    FilteredObserver,
+    async_queue_observer,
+    json_file_observer,
+    logging_observer,
+)
 
 
 def test_tracked_dict_logs_updates() -> None:

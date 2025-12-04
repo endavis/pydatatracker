@@ -50,7 +50,7 @@ pip install pydatatracker
 - Use Python 3.12+ with modern type hints and the `@override` decorator.
 - Maintain ≥69% test coverage; prefer `uv run pytest` or `just coverage` when
   validating complex changes.
-- Formatting is handled by Black (line length 100). Ruff enforces lint rules.
+- Formatting and linting are handled by Ruff (line length 100).
 - Temporary scratch work should live in `tmp/` so the project root stays clean.
 
 ## Releasing

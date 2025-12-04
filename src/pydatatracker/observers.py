@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from collections import deque
-from importlib import import_module
-from pathlib import Path
-from typing import Any, Callable, Deque, Iterable
 import json
 import logging
+from collections import deque
+from collections.abc import Callable, Iterable
+from importlib import import_module
+from pathlib import Path
+from typing import Any
 
-from .exporters import KafkaExporter, JsonLinesExporter, HttpExporter, S3Exporter
+from .exporters import HttpExporter, JsonLinesExporter, KafkaExporter, S3Exporter
 from .utils.changelog import ChangeLogEntry
 
 
@@ -31,7 +32,7 @@ class ChangeCollector:
 
         self.capacity = capacity
         self.include_init_events = include_init_events
-        self._changes: Deque[ChangeLogEntry] = deque(maxlen=self.capacity)
+        self._changes: deque[ChangeLogEntry] = deque(maxlen=self.capacity)
 
     def __call__(self, change: ChangeLogEntry) -> None:  # pragma: no cover - trivial
         if not self.include_init_events and change.extra.get("action") == "init":
@@ -156,7 +157,11 @@ def build_observer_from_config(config: dict[str, Any]) -> Callable[[ChangeLogEnt
         return HttpExporter(post_callable, options["url"], **options.get("params", {}))
     if kind == "s3_exporter":
         client = _resolve_callable(options["client_callable"])()
-        return S3Exporter(client, bucket=options["bucket"], prefix=options.get("prefix", "changes/"))
+        return S3Exporter(
+            client,
+            bucket=options["bucket"],
+            prefix=options.get("prefix", "changes/"),
+        )
     if kind == "kafka_exporter":
         producer = _resolve_callable(options["producer_callable"])()
         return KafkaExporter(producer, topic=options["topic"])
@@ -167,15 +172,6 @@ def _resolve_callable(path: str) -> Callable[..., Any]:
     module, attr = path.rsplit(".", 1)
     mod = import_module(module)
     return getattr(mod, attr)
-
-class MetricsObserver:
-    def __init__(self, counter):
-        self.counter = counter
-
-    def __call__(self, change):
-        key = change.extra.get('action', 'unknown')
-        self.counter.labels(action=key).inc()
-
 
 class MetricsObserver:
     """Simple metrics observer wrapping a Counter-like interface."""

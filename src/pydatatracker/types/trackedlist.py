@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Project: bastproxy
 # Filename: pydatatracker/types/trackedlist.py
 #
@@ -39,12 +38,12 @@ Classes:
 """
 
 # Standard Library
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 # 3rd Party
-
 # Project
-from ._trackbase import TrackBase, track_changes, check_lock
+from ._trackbase import TrackBase, check_lock, track_changes
 
 if TYPE_CHECKING:
     from ..utils.changelog import ChangeLogEntry

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Project: bastproxy
 # Filename: pydatatracker/types/trackedattributes.py
 #
@@ -41,10 +40,9 @@ Classes:
 # Standard Library
 import contextlib
 import sys
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 # 3rd Party
-
 # Project
 from ..types._trackbase import TrackBase, track_changes
 

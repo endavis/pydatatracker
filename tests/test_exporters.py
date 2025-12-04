@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from pydatatracker import TrackedDict
-from pydatatracker.exporters import JsonLinesExporter, HttpExporter, KafkaExporter, S3Exporter
+from pydatatracker.exporters import HttpExporter, JsonLinesExporter, KafkaExporter, S3Exporter
 
 
 def _make_change():

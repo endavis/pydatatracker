@@ -1,27 +1,28 @@
 set shell := ["bash", "-lc"]
+UV_CACHE_DIR := "/tmp/uv-cache"
 
 # Default target prints available recipes
 default:
 	@just --list
 
 install:
-	uv venv --seed
-	uv pip install -e '.[dev]'
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv venv --seed
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv pip install -e '.[dev]'
 
 lint:
-	uv run ruff check src tests
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv run ruff check src tests
 
 format:
-	uv run black src tests
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv run ruff format src tests
 
 format-check:
-	uv run black --check src tests
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv run ruff format --check src tests
 
 test:
-	uv run pytest
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv run pytest
 
 coverage:
-	uv run pytest --cov=pydatatracker --cov-report=term-missing
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv run pytest --cov=pydatatracker --cov-report=term-missing
 
 check: lint format-check test
 
@@ -29,14 +30,14 @@ clean:
 	rm -rf .ruff_cache .pytest_cache htmlcov .coverage*
 
 benchmark:
-	uv run python scripts/benchmark.py
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv run python scripts/benchmark.py
 
 build:
-	uv build
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv build
 
 publish:
-	uv build
-	PYPI_TOKEN=${PYPI_TOKEN:?set PYPI_TOKEN} uv publish --token "$PYPI_TOKEN"
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv build
+	PYPI_TOKEN=${PYPI_TOKEN:?set PYPI_TOKEN} UV_CACHE_DIR={{UV_CACHE_DIR}} uv publish --token "$PYPI_TOKEN"
 
 cli:
-	uv run python scripts/cli.py demo
+	UV_CACHE_DIR={{UV_CACHE_DIR}} uv run python scripts/cli.py demo
