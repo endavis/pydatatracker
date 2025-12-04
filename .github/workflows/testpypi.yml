@@ -21,10 +21,7 @@ jobs:
           version: "latest"
       - name: Build artifacts
         run: uv build
-        env:
-          UV_CACHE_DIR: .uv-cache
       - name: Publish to TestPyPI
         run: uv publish --repository-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN"
         env:
           TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
-          UV_CACHE_DIR: .uv-cache

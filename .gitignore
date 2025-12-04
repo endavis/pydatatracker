@@ -23,6 +23,7 @@ build/
 dist/
 .eggs/
 *.egg-info/
+.uv-cache/
 
 # Project specific
 .tmp/
