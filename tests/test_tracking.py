@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-import time
 import types
 from pathlib import Path
 
@@ -55,30 +54,6 @@ def test_tracking_changes_can_be_limited() -> None:
 
     assert len(history) == 1
     assert history[0].extra["location"] == "b"
-
-
-def _measure_assignment_time(snapshot: bool, iterations: int = 2000) -> float:
-    tracked = TrackedDict(tracking_capture_snapshots=snapshot)
-    start = time.perf_counter()
-    for index in range(iterations):
-        tracked[str(index)] = index
-    end = time.perf_counter()
-    return end - start
-
-
-def test_snapshot_mode_relative_timing() -> None:
-    """Report timing difference between snapshot modes for manual inspection."""
-    baseline = _measure_assignment_time(snapshot=False)
-    snapshot = _measure_assignment_time(snapshot=True)
-    percent = ((snapshot - baseline) / baseline * 100) if baseline else float("inf")
-
-    print(
-        f"tracking_capture_snapshots timing: off={baseline:.6f}s "
-        f"on={snapshot:.6f}s ({snapshot - baseline:.6f}s delta, "
-        f"{percent:.2f}% slower)"
-    )
-
-    assert snapshot >= baseline
 
 
 def test_capture_stack_is_opt_in() -> None:
