@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793657570129,
+  "lastUpdate": 1793658698080,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -437,6 +437,100 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008189466523350715",
             "extra": "mean: 36.751933333789566 usec\nrounds: 30"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c318a6e11b032acd9c311aaecfb950226ba212ce",
+          "message": "feat: declare monitored fields on the class and make the init entry optional (merges PR #25, addresses #5)\n\nTrackedAttr subclasses can declare `_tracking_fields`. Declared fields are\nmonitored from their first assignment, which records no change entry; later\nassignments record `update` as before. Fields are merged across the MRO,\nparent first. `tracking_add_attribute_to_monitor` is unchanged for dynamic\nfields.\n\nTrackBase, TrackedDict, TrackedList and TrackedAttr accept\n`tracking_record_init`. It resolves from the explicit kwarg, then the\nparent, then the class default: existing classes still record `init`;\nclasses that declare fields default to off.\n\nTrackedAttr.__setattr__ now sends `_tracking_*` internals and unmonitored,\nundeclared names straight to object.__setattr__.\n\nCreating an object with 4 declared fields is about 3.6x faster than the\nprevious monitored-field path, with 0 history entries.\n\nAddresses #5\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-02T22:30:12Z",
+          "tree_id": "5b1893bf71a2f182d6806b18c7e8a25ea1dd601f",
+          "url": "https://github.com/endavis/pydatatracker/commit/c318a6e11b032acd9c311aaecfb950226ba212ce"
+        },
+        "date": 1793658697634,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 425.199378713226,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000254959100816802",
+            "extra": "mean: 2.3518378672760147 msec\nrounds: 437"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 137.10907422804087,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00008709281292598185",
+            "extra": "mean: 7.293463292858299 msec\nrounds: 140"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 424.9535224748849,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004068607132774486",
+            "extra": "mean: 2.3531985196312872 msec\nrounds: 433"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 438.9480977709991,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00007712982787393196",
+            "extra": "mean: 2.278173672646154 msec\nrounds: 446"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[100]",
+            "value": 67838.6164381418,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000011901228764625778",
+            "extra": "mean: 14.740866670119127 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[1000]",
+            "value": 55315.64953016108,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000011651731208093736",
+            "extra": "mean: 18.078066668181236 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[10000]",
+            "value": 30278.623896988705,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000035204363416794477",
+            "extra": "mean: 33.02660000012262 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_monitored",
+            "value": 49504.03233838799,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000024439989097707843",
+            "extra": "mean: 20.200374651592742 usec\nrounds: 51664"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_update",
+            "value": 1847063.1728468863,
+            "unit": "iter/sec",
+            "range": "stddev: 6.713602900425368e-8",
+            "extra": "mean: 541.3999990366847 nsec\nrounds: 200"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_declared",
+            "value": 81234.78936429568,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001856449672553875",
+            "extra": "mean: 12.309996835413967 usec\nrounds: 83739"
           }
         ]
       }
