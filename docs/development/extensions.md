@@ -116,8 +116,8 @@ class UserFactory(factory.Factory):
     class Meta:
         model = User
 
-    endavis = factory.Sequence(lambda n: f"user{n}")
-    email = factory.LazyAttribute(lambda obj: f"{obj.endavis}@example.com")
+    username = factory.Sequence(lambda n: f"user{n}")
+    email = factory.LazyAttribute(lambda obj: f"{obj.username}@example.com")
 ```
 
 ### mutmut - Mutation testing
