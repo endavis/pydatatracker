@@ -14,7 +14,8 @@ that make it easy to monitor modifications made while composing complex data pay
 - **State awareness** – record every mutation to your domain objects
 - **Composable types** – nest tracked containers or regular Python types
 - **Observer-friendly** – emit structured change logs for audit pipelines
-- **Lightweight by default** – snapshots, stack capture and actors are opt-in
+- **Lightweight by default** – snapshots, stack capture and actors are opt-in; declare
+  `_tracking_fields` on a `TrackedAttr` subclass to skip creation-time log entries
 
 ## Installation
 

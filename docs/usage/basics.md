@@ -58,6 +58,33 @@ changes = tracked.changes_since(first_change)
 print([entry.extra["location"] for entry in changes])
 ```
 
+### Declaring monitored fields
+
+Subclass `TrackedAttr` and list the fields to monitor in `_tracking_fields`. Declared fields
+are monitored from their first assignment without a `start monitoring` entry, so creating the
+object logs nothing; later assignments record `update` entries.
+
+```python
+class Account(TrackedAttr):
+    _tracking_fields = ("owner", "balance")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.owner = "ann"
+        self.balance = 0
+
+account = Account()
+assert account.tracking_changes() == []
+account.balance = 5  # records an "update" entry
+```
+
+Declared fields are combined across subclasses (parent fields first). Classes that declare
+fields do not record the `init` entry by default. Pass `tracking_record_init=True` (or set
+`_tracking_record_init = True` on the class) to keep it, or `tracking_record_init=False` on
+`TrackedDict` / `TrackedList` / `TrackedAttr` to drop it. Children inherit the setting from
+their parent. `tracking_add_attribute_to_monitor` still records `start monitoring` for
+dynamic attributes.
+
 ### Observers
 
 Register observers to receive every `ChangeLogEntry` as it happens. The bundled

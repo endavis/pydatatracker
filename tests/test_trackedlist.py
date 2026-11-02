@@ -84,3 +84,12 @@ def test_tracked_list_snapshot_opt_in_records_repr() -> None:
     plain_change = plain.tracking_changes()[-1]
     assert "data_pre_change" not in plain_change.extra
     assert "data_post_change" not in plain_change.extra
+
+
+def test_tracked_list_record_init_false_has_no_entries() -> None:
+    assert TrackedList(tracking_record_init=False).tracking_changes() == []
+
+
+def test_tracked_list_default_records_init() -> None:
+    changes = TrackedList().tracking_changes()
+    assert [c.extra["action"] for c in changes] == ["init"]
