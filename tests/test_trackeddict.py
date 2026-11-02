@@ -116,3 +116,34 @@ def test_tracked_dict_snapshot_opt_in_records_repr() -> None:
     tracked2["a"] = 1
     change2 = tracked2.tracking_changes()[-1]
     assert "data_pre_change" not in change2.extra
+
+
+def test_forwarded_child_change_is_recorded_once_on_parent() -> None:
+    """A change forwarded from a nested child appears exactly once in the parent log."""
+    parent = TrackedDict({"child": {"state": "draft"}}, tracking_auto_convert=True)
+    before = len(parent.tracking_changes())
+
+    parent["child"]["state"] = "final"
+
+    changes = parent.tracking_changes()
+    assert len(changes) == before + 1
+    assert changes[-1].extra["location"] == "child:state"
+    uuids = [entry.uuid for entry in changes]
+    assert len(uuids) == len(set(uuids))
+    assert parent._tracking_change_uuids == set(uuids)
+
+
+def test_same_entry_is_recorded_once() -> None:
+    """Passing the same entry to the parent twice records it only once."""
+    tracked = TrackedDict({"a": 1})
+    tracked["a"] = 2
+    entry = tracked.tracking_changes()[-1]
+    count = len(tracked.tracking_changes())
+
+    assert tracked._tracking_record_change(entry) is False
+    tracked._tracking_notify_observers(entry)
+
+    assert len(tracked.tracking_changes()) == count
+    new_entry = ChangeLogEntry(tracked._tracking_uuid, action="x")
+    assert tracked._tracking_record_change(new_entry) is True
+    assert tracked.tracking_changes()[-1] is new_entry

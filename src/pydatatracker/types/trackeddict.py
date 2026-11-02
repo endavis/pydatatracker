@@ -161,8 +161,7 @@ class TrackedDict(TrackBase, dict):
                 new_change.extra["location"] = f"{tracked_item['location']}"
             change_log_entry = new_change
 
-        if change_log_entry not in self._tracking_changes:
-            self._tracking_changes.append(change_log_entry)
+        self._tracking_record_change(change_log_entry)
         super()._tracking_notify_observers(change_log_entry)
 
     @check_lock

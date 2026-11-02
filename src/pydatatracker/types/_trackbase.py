@@ -250,6 +250,7 @@ class TrackBase:
         self._tracking_observers: dict[int, list[_ObserverRef]] = {}
         self._tracking_context: dict[str, Any] = {}
         self._tracking_changes: list[ChangeLogEntry] = []
+        self._tracking_change_uuids: set[str] = set()
         self._tracking_locked = False
         self._tracking_auto_convert = tracking_auto_convert
         self._tracking_created = datetime.datetime.now()
@@ -528,8 +529,28 @@ class TrackBase:
         change_log_entry.add_to_tree(
             self._tracking_format_tree_location(change_log_entry.extra.get("location", None))
         )
-        self._tracking_changes.append(change_log_entry)
+        self._tracking_record_change(change_log_entry)
         self._tracking_notify_observers(change_log_entry)
+
+    def _tracking_record_change(self, change_log_entry: ChangeLogEntry) -> bool:
+        """Append an entry to the change history unless it is already recorded.
+
+        Membership is checked against a set of entry UUIDs (O(1)) instead of scanning
+        the list; ``ChangeLogEntry.__eq__`` compares UUIDs, so the result is the same.
+        All writes to ``_tracking_changes`` go through here to keep both in sync.
+
+        Args:
+            change_log_entry: The entry to record.
+
+        Returns:
+            True if the entry was added, False if it was already recorded.
+
+        """
+        if change_log_entry.uuid in self._tracking_change_uuids:
+            return False
+        self._tracking_change_uuids.add(change_log_entry.uuid)
+        self._tracking_changes.append(change_log_entry)
+        return True
 
     def _tracking_format_tree_location(self, location: str | None = "") -> dict[str, str]:
         """Format the tree location for a change log entry.
