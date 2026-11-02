@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793651942406,
+  "lastUpdate": 1793652715909,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -208,6 +208,58 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00004514427737385995",
             "extra": "mean: 3.721169659340996 msec\nrounds: 273"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "50189fa45021fc76c2cf94e008d82489cefa1a0a",
+          "message": "release: v0.1.1 (merges PR #16)\n\nchore: update changelog for v0.1.1",
+          "timestamp": "2026-11-02T20:50:41Z",
+          "tree_id": "287082985f10a98ced53f30506cc70cb0cc4ff15",
+          "url": "https://github.com/endavis/pydatatracker/commit/50189fa45021fc76c2cf94e008d82489cefa1a0a"
+        },
+        "date": 1793652714283,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 258.2050563082543,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000052808912817773456",
+            "extra": "mean: 3.872890850000105 msec\nrounds: 260"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 109.10329953433565,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008855308510217438",
+            "extra": "mean: 9.165625643478291 msec\nrounds: 115"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 254.57408449144742,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00020790583509294476",
+            "extra": "mean: 3.928129613026638 msec\nrounds: 261"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 257.63159887191034,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004380664611714954",
+            "extra": "mean: 3.8815114464945015 msec\nrounds: 271"
           }
         ]
       }
