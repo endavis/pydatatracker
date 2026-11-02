@@ -294,6 +294,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_trackeddict.py",
     "tests/test_trackedlist.py",
     "tests/test_tracking.py",
+    "tests/test_version.py",
 ]
 # mutmut passes -x to pytest itself. --assert=plain skips assertion rewriting,
 # which mutmut has no use for: it reads only whether the tests pass (#839).
