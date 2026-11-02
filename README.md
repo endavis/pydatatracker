@@ -1,4 +1,9 @@
-# PyDataTracker
+# pydatatracker
+
+[![CI](https://github.com/endavis/pydatatracker/actions/workflows/ci.yml/badge.svg)](https://github.com/endavis/pydatatracker/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/endavis/pydatatracker/branch/main/graph/badge.svg)](https://codecov.io/gh/endavis/pydatatracker)
+[![PyPI version](https://badge.fury.io/py/pydatatracker.svg)](https://badge.fury.io/py/pydatatracker)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
 Utilities for building Python applications that require detailed state tracking. The
 package exposes tracked dictionary/list/attribute containers plus change-log helpers
@@ -9,19 +14,7 @@ that make it easy to monitor modifications made while composing complex data pay
 - **State awareness** – record every mutation to your domain objects
 - **Composable types** – nest tracked containers or regular Python types
 - **Observer-friendly** – emit structured change logs for audit pipelines
-
-## Project layout
-
-```
-.
-├── AGENTS.md          # Unified contributor instructions
-├── docs/              # Design notes & future specs
-├── src/pydatatracker  # Library code (tracked containers and utilities)
-├── tests/             # Pytest suite
-├── tmp/               # Scratch directory (ignored, safe for experiments)
-├── justfile           # Repeatable task runner configured for uv
-└── pyproject.toml     # Build metadata + tooling config
-```
+- **Lightweight by default** – snapshots, stack capture and actors are opt-in
 
 ## Installation
 
@@ -29,107 +22,300 @@ that make it easy to monitor modifications made while composing complex data pay
 pip install pydatatracker
 ```
 
-## Getting started
-
-1. Create and activate a virtual environment managed by `uv`:
-   ```bash
-   just install
-   ```
-2. Run the test-suite:
-   ```bash
-   just test
-   ```
-3. Keep formatting and linting consistent:
-   ```bash
-   just format
-   just lint
-   ```
-
-## Development workflow
-
-- Use Python 3.12+ with modern type hints and the `@override` decorator.
-- Maintain ≥69% test coverage; prefer `uv run pytest` or `just coverage` when
-  validating complex changes.
-- Formatting and linting are handled by Ruff (line length 100).
-- Temporary scratch work should live in `tmp/` so the project root stays clean.
-
-## Releasing
-
-- Update `CHANGELOG.md` and `src/pydatatracker/_version.py`.
-- Run `just test` and `just publish` (requires `PYPI_TOKEN`).
-- See `docs/packaging.md` for the full checklist.
-
-## Resources
-
-- Contribution rules: see `AGENTS.md`
-- Architecture notes: `docs/architecture.md`
-- Debugging cookbook: `docs/debugging.md`
-- Issue tracker: open issues against the upstream GitHub repository referenced in the
-  project URLs.
-
-## Tracking actors
-
-Set a temporary actor when mutating tracked objects to avoid stack inspection overhead::
+## Quick Start
 
 ```python
-from pydatatracker import TrackedDict, tracking_actor
+from pydatatracker import ChangeCollector, TrackedDict, tracking_actor
 
-tracked = TrackedDict()
-with tracking_actor('provisioner'):
-    tracked['status'] = 'ready'
-
-print(tracked.tracking_changes()[0].actor)  # => provisioner
-```
-
-Snapshots (`tracking_capture_snapshots=True`), stack capture (`tracking_capture_stack=True`), and actors are all opt-in so the fast path stays lightweight. Enable only the knobs you need for debugging or auditing.
-
-## Inspecting change history
-
-Each tracked object exposes `tracking_changes()`, `last_change()`, and `changes_since(...)` so callers can safely inspect audit history without dipping into private attributes. For example:
-
-```python
-changes = tracked.changes_since(first_change)
-print([entry.extra["location"] for entry in changes])
-```
-
-## Observers
-
-Register observers to receive every `ChangeLogEntry` as it happens. The bundled `ChangeCollector` stores entries in memory:
-
-```python
-from pydatatracker import ChangeCollector, TrackedDict
-
-tracked = TrackedDict()
+payload = TrackedDict()
 collector = ChangeCollector()
-tracked.tracking_add_observer(collector)
-tracked["mode"] = "debug"
+payload.tracking_add_observer(collector)
 
-print(collector.as_list()[-1].extra["location"])  # mode
+with tracking_actor("importer"):
+    payload["status"] = "ready"
+
+print(payload.last_change().actor)  # importer
+print(collector.as_list()[-1].to_dict())
 ```
 
-You can also register async-friendly observers using `async_queue_observer` to push changes onto an `asyncio.Queue`. For metrics, wrap a Prometheus (or compatible) counter via `telemetry_observer()` to increment labels per action.
+See the [Usage Guide](docs/usage/basics.md) for history inspection, observers and exporters, and
+the [Debugging & Observability Cookbook](docs/usage/debugging.md) for snapshot and stack capture.
 
+## Documentation
 
-## Benchmarks
+📚 **Full documentation is available in the [docs/](docs/) directory**
 
-Use `just benchmark` to measure the overhead of observability features. Sample output:
-
-```
-Benchmark results (5000 mutations, 5 runs)
-  base     mean=1.05s stdev=0.03s
-  actor    mean=1.01s stdev=0.04s
-  snapshot mean=4.52s stdev=0.22s
-  full     mean=4.25s stdev=0.18s
+Build and view locally:
+```bash
+doit docs_serve  # Opens at http://127.0.0.1:8000
 ```
 
-## CLI
-Run `just cli` to execute the demo CLI (writes a tracked change to stdout).
+Key documentation files:
+- [Installation Guide](docs/getting-started/installation.md) - Setup instructions
+- [Usage Guide](docs/usage/basics.md) - Package usage, development workflows and commands
+- [Architecture Notes](docs/development/architecture.md) - How containers, change logs and observers fit together
+- [API Reference](docs/reference/api.md) - Complete API documentation
+- [Extensions Guide](docs/development/extensions.md) - Optional tools and extensions
 
-## Exporters
-Use builders in `pydatatracker.exporters` (e.g., `JsonLinesExporter`, `HttpExporter`, `S3Exporter`, `KafkaExporter`) to stream serialized change dicts to external systems.
+## Development Setup
 
-### Config-based observers
-Define observer lists in JSON and load them with `pydatatracker.config.load_observers_from_json`.
+### Prerequisites
 
-### Benchmarks in CI
-GitHub Actions runs `scripts/benchmark.py` on every push; keep average times within ~5x of the base to avoid regressions.
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv) - Fast Python package installer
+- [direnv](https://direnv.net/) - Automatic environment variable loading (optional but recommended)
+
+### Quick Start
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone repository
+git clone https://github.com/endavis/pydatatracker.git
+cd pydatatracker
+
+# Create virtual environment and install dependencies
+uv sync --all-extras --dev
+
+# Install pre-commit hooks
+doit pre_commit_install
+
+# Optional: Install direnv for automatic environment management
+# macOS:
+brew install direnv
+
+# Linux (using doit helper):
+doit install_direnv
+
+# Hook direnv into your shell (one-time setup)
+# Bash:
+echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+source ~/.bashrc
+
+# Zsh:
+echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+source ~/.zshrc
+
+# Allow direnv to load .envrc
+direnv allow
+
+# Optional: Create .envrc.local for personal overrides
+cp .envrc.local.example .envrc.local
+```
+
+The development tools, `doit` included, live in the `dev` and `security` extras, and a plain
+`uv sync` uninstalls them. Sync again later with `doit install_dev`, which runs the same command.
+
+## Versioning & Releases
+
+This project uses automated versioning and releases powered by `commitizen` and `hatch-vcs`.
+
+- **Single Source of Truth:** The Git tag is the definitive version. `pyproject.toml` and `_version.py` are generated at build time from tags (no manual edits).
+- **Versioning Scheme:**
+    - **Production:** Standard SemVer (e.g., `v1.0.0`).
+    - **Pre-release:** PEP 440, as commitizen writes it (e.g., `v1.0.1a0`, `v1.0.1b0`, `v1.0.1rc0`).
+
+### Creating a Release
+
+A release goes through a pull request. Run both steps from `main`.
+
+**1. Open the release PR:**
+```bash
+doit release                     # Production release (PyPI)
+doit release --prerelease=alpha  # Pre-release (TestPyPI): alpha, beta or rc
+```
+This automated task will:
+1.  Calculate the next version based on conventional commits.
+2.  Create a `release/v<version>` branch.
+3.  Update `CHANGELOG.md` on it, merging any pre-release entries (commitizen `--merge-prerelease`).
+4.  Push the branch and open a PR titled `release: v<version>`.
+
+**2. After the PR merges, tag the release:**
+```bash
+doit release_tag
+```
+This tags `main` with `v<version>` and pushes the tag:
+- A production tag (e.g., `v1.0.0`) triggers the `release` workflow, which publishes to TestPyPI and then PyPI.
+- A pre-release tag (e.g., `v1.0.1a0`) triggers the `testpypi` workflow.
+
+### Environment Variables
+
+This project uses direnv for automatic environment management. After setup:
+- `.envrc` (committed) contains project defaults and is loaded automatically
+- `.envrc.local` (git-ignored) is for personal overrides and credentials
+- Environment variables are set automatically when you enter the project directory
+- Virtual environment is activated automatically
+
+### Manual Setup (without direnv)
+
+If you prefer not to use direnv:
+
+```bash
+# Create virtual environment and activate it
+uv venv
+source .venv/bin/activate
+
+# Set environment variables manually
+# uv keeps its default cache, shared by every checkout and project
+
+# Install dependencies
+uv sync --all-extras --dev
+```
+
+## Available Tasks
+
+View all available tasks:
+
+```bash
+doit list
+```
+
+### Quick Commands
+
+```bash
+# Testing
+doit test          # Run tests (parallel execution with pytest-xdist)
+doit coverage      # Run tests with coverage report
+
+# Code Quality
+doit format        # Format code with ruff
+doit lint          # Run linting
+doit type_check    # Run type checking with mypy
+doit check         # Run ALL checks (format, lint, type check, security, audit, spell, test)
+
+# Security
+doit security      # Run security scan with bandit
+doit audit         # Run dependency vulnerability audit
+doit spell_check   # Check for typos with codespell
+doit licenses      # Check licenses of dependencies
+
+# Code Formatting
+doit fmt_pyproject # Format pyproject.toml with pyproject-fmt
+
+# Version Management (Commitizen)
+doit commit        # Interactive commit with conventional format
+doit release       # Open a release PR (--prerelease=alpha|beta|rc for TestPyPI)
+doit release_tag   # Tag main after the release PR merges
+
+# Documentation
+doit docs_serve    # Serve docs locally with live reload
+doit docs_build    # Build documentation site
+doit docs_deploy   # Deploy docs to GitHub Pages
+
+# Maintenance
+doit cleanup       # Clean build artifacts and caches
+doit update_deps   # Update dependencies and run tests
+```
+
+See the [Usage Guide](docs/usage/basics.md) for comprehensive documentation of all development workflows.
+
+## Running Tests
+
+```bash
+# Run all tests (parallel execution - fast!)
+doit test
+
+# Run with coverage
+doit coverage
+
+# View coverage report
+open tmp/htmlcov/index.html
+
+# Advanced: Run specific test directly
+uv run pytest tests/test_example.py::test_version -v
+```
+
+## Code Quality
+
+This project includes comprehensive tooling:
+
+### Core Tools
+- **uv** - Fast Python package installer and dependency manager
+- **ruff** - Extremely fast Python linter and formatter
+- **mypy** - Static type checker with strict mode
+- **pytest** - Testing framework with parallel execution (pytest-xdist)
+
+### Quality & Security
+- **bandit** - Security vulnerability scanner
+- **codespell** - Spell checker for code and documentation
+- **pip-audit** - Dependency vulnerability auditor
+- **pip-licenses** - License compliance checker
+- **pre-commit** - Git hooks for automated quality checks
+- **pyproject-fmt** - Keep pyproject.toml formatted and organized
+- **commitizen** - Enforce conventional commit message standards
+
+### Documentation
+- **MkDocs** - Documentation site generator
+- **mkdocs-material** - Material Design theme for MkDocs
+
+Run all quality checks:
+
+```bash
+doit check
+```
+
+### Pre-commit Hooks
+
+Install hooks to run checks automatically before each commit:
+
+```bash
+doit pre_commit_install
+```
+
+Hooks include:
+- Code formatting (ruff)
+- Type checking (mypy)
+- Security scanning (bandit)
+- Spell checking (codespell)
+- YAML/TOML validation
+- Trailing whitespace removal
+- Private key detection
+
+## AI Agent Support
+
+This project supports **Claude Code**, **GitHub Copilot CLI**, **Codex CLI**, and **Antigravity CLI** (`agy`). All four agents ship a complete cross-agent review command surface for self-action and cross-agent delegation, with slash names that differ by host: Claude uses colon separators (`/claude:review`, `/claude:adversarial-review`); Copilot and Codex use hyphen separators (`/copilot-review`, `$codex-adversarial-review`) because their command surface is skills and skill names cannot contain colons; Antigravity activates skills by `description:` match with no prefix. The shared workflow is: say "implement issue N" → review the PR → `doit pr_merge --auto-close`.
+
+### Requirements
+
+> **Important:** [GitHub CLI (`gh`)](https://cli.github.com/) is **required** for AI-assisted workflows.
+>
+> Many `doit` tasks use `gh` for issue creation, PR management, and repository operations.
+> Install and authenticate before using AI agents:
+> ```bash
+> # Install (macOS)
+> brew install gh
+>
+> # Install (Linux) - see https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+>
+> # Authenticate
+> gh auth login
+> ```
+
+### Features
+
+- **AGENTS.md** - Instructions and protocols for AI agents
+- **Dangerous command blocking** - Hooks prevent destructive operations (force push to main, branch deletion, etc.)
+- **Workflow automation** - `doit issue` and `doit pr` for GitHub operations
+
+See [AI Agent Setup](docs/development/AI_SETUP.md) and [AI Command Blocking](docs/development/ai/command-blocking.md) for details.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests and checks (`doit check`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Add acknowledgments here

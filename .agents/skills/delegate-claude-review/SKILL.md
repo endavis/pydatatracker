@@ -1,0 +1,34 @@
+---
+name: delegate-claude-review
+description: Delegate a read-only code review of current changes to Claude Code. Hands the review to Claude via `claude -p` and returns findings to the calling agent.
+---
+
+# Delegate Review to Claude
+
+Hand off a read-only code review of current changes to Claude Code.
+
+## When to use
+
+Use this skill when the user explicitly wants a review done by Claude (not the host agent itself).
+
+Expected prompt shape:
+
+- `$delegate-claude-review review the current changes`
+- `$delegate-claude-review have Claude review this branch`
+
+The user may include optional focus text after the trigger.
+
+## Instructions
+
+Resolve the configured model first (`<host>` is `codex` or `antigravity`, whichever CLI you are): `uv run doit agent_cmd --role=review --host=<host> --cli=claude`. Its last stdout line is JSON with `mode: cli` and a `command` string. Run that `command` in place of the literal invocation below, replacing `'<prompt>'` with the prompt text from the literal. If the task is unavailable or fails, run the literal below as is; with no config the two are identical. See [Agent roles](../../../docs/development/ai/agent-roles.md).
+
+1. Capture any focus text from the user's request.
+2. Run Claude Code non-interactively. Hybrid C: prefer the existing `/claude:review` command if available, otherwise the prompt is fully inlined.
+
+   ```bash
+   claude -p 'Review the current uncommitted changes and the current branch vs main, read-only. 1) Run `git status` and `git diff` to see what changed. 2) Run `git log main..HEAD --oneline` for branch context. 3) Read AGENTS.md and any relevant ADRs in docs/decisions/. 4) Identify correctness issues, risks, missing tests, style/convention violations, and concrete suggestions. 5) Print findings to stdout in a structured format (Summary / Issues / Suggestions). Do NOT modify any files. Focus area (optional): <focus>. If the focus area names any of `errors`, `tests`, `types`, `comments`, read `docs/development/ai/review-focus-areas.md` and apply those checklists in addition to the general review.'
+   ```
+
+3. Capture stdout and summarize the review findings.
+4. Highlight blocking issues vs nits.
+5. Do NOT auto-apply suggestions — the user decides what to act on.
