@@ -39,7 +39,7 @@ def test_http_exporter_invokes_post(monkeypatch: pytest.MonkeyPatch) -> None:
 
     exporter = HttpExporter(fake_post, "https://api.example.com/")
     exporter(_make_change())
-    assert captured["url"].startswith("https://api.example.com")
+    assert captured["url"] == "https://api.example.com/"
     assert captured["json"]["extra"]["location"] == "foo"
 
 
