@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import json
 import logging
 from collections import deque
@@ -119,15 +121,18 @@ def json_file_observer(path: str | Path) -> Callable[[ChangeLogEntry], None]:
     return _observer
 
 
-def async_queue_observer(queue):
-    import asyncio
+_background_tasks: set[asyncio.Task[None]] = set()
 
+
+def async_queue_observer(queue):
     async def _async_enqueue(change):
         await queue.put(change.to_dict())
 
     def _observer(change):
-        if asyncio.iscoroutinefunction(queue.put):
-            asyncio.create_task(_async_enqueue(change))
+        if inspect.iscoroutinefunction(queue.put):
+            task = asyncio.create_task(_async_enqueue(change))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
         else:
             queue.put(change.to_dict())
 
