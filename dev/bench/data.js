@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793647059109,
+  "lastUpdate": 1793647373439,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -104,6 +104,58 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00006490234061766139",
             "extra": "mean: 3.751025640740361 msec\nrounds: 270"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "909b3bdd7d660edfba89f95dbf639b3bea0500ce",
+          "message": "docs: replace placeholder contact email in SECURITY.md and CODE_OF_CONDUCT.md (merges PR #15, addresses #14)\n\nThe configurator filled both contact addresses from the maintainer email,\nwhich was unset, so they kept the template placeholder\n`your.email@example.com`. Use `endavis.github@endavis.net`.\n\nRefs #14\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-02T19:22:06Z",
+          "tree_id": "c77f4f545018b8adcc68456cc3d501900a5571ac",
+          "url": "https://github.com/endavis/pydatatracker/commit/909b3bdd7d660edfba89f95dbf639b3bea0500ce"
+        },
+        "date": 1793647372954,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 461.48410112584907,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00030475256385545694",
+            "extra": "mean: 2.166921888663928 msec\nrounds: 494"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 212.237432589946,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00041142090507310377",
+            "extra": "mean: 4.711704188073425 msec\nrounds: 218"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 489.9799046188481,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000026107490297648245",
+            "extra": "mean: 2.0409000258447185 msec\nrounds: 503"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 493.56698260156105,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000387068494922279",
+            "extra": "mean: 2.0260674543687296 msec\nrounds: 515"
           }
         ]
       }
