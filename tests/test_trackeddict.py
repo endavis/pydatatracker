@@ -147,3 +147,12 @@ def test_same_entry_is_recorded_once() -> None:
     new_entry = ChangeLogEntry(tracked._tracking_uuid, action="x")
     assert tracked._tracking_record_change(new_entry) is True
     assert tracked.tracking_changes()[-1] is new_entry
+
+
+def test_tracked_dict_record_init_false_has_no_entries() -> None:
+    assert TrackedDict(tracking_record_init=False).tracking_changes() == []
+
+
+def test_tracked_dict_default_records_init() -> None:
+    changes = TrackedDict().tracking_changes()
+    assert [c.extra["action"] for c in changes] == ["init"]

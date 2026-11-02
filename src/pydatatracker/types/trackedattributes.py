@@ -41,7 +41,7 @@ Classes:
 # Standard Library
 import contextlib
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 # 3rd Party
 # Project
@@ -60,7 +60,36 @@ class TrackedAttr(TrackBase):
     the monitoring list, notifying observers of changes, and maintaining original
     values of attributes.
 
+    Subclasses can declare their monitored fields up front with the
+    ``_tracking_fields`` class variable. Declared fields are monitored from their
+    first assignment without recording a ``start monitoring`` entry; later
+    assignments record ``update`` entries as usual. Declared fields are unioned
+    across the MRO (parent fields first). A class that declares fields defaults to
+    not recording the ``init`` entry; pass ``tracking_record_init=True`` or set
+    ``_tracking_record_init = True`` on the class to keep it. Attributes added
+    with ``tracking_add_attribute_to_monitor`` still record ``start monitoring``.
+
     """
+
+    _tracking_fields: ClassVar[tuple[str, ...]] = ()
+    _tracking_declared_fields: ClassVar[tuple[str, ...]] = ()
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Compute the declared monitored fields for a subclass.
+
+        Args:
+            **kwargs: Passed through to the parent implementation.
+
+        """
+        super().__init_subclass__(**kwargs)
+        declared: list[str] = []
+        for klass in reversed(cls.__mro__):
+            for name in klass.__dict__.get("_tracking_fields", ()):
+                if name not in declared:
+                    declared.append(name)
+        cls._tracking_declared_fields = tuple(declared)
+        if cls.__dict__.get("_tracking_fields") and "_tracking_record_init" not in cls.__dict__:
+            cls._tracking_record_init = False
 
     def __init__(
         self,
@@ -69,6 +98,7 @@ class TrackedAttr(TrackBase):
         tracking_location: str | None = "",
         tracking_capture_snapshots: bool | None = None,
         tracking_capture_stack: bool | None = None,
+        tracking_record_init: bool | None = None,
     ) -> None:
         """Initialize a TrackedAttr instance.
 
@@ -84,11 +114,17 @@ class TrackedAttr(TrackBase):
             tracking_location: The location identifier for the tracked attribute.
             tracking_capture_snapshots: Whether to capture before/after repr snapshots.
             tracking_capture_stack: Whether to capture stack traces for changes.
+            tracking_record_init: Whether to record the ``init`` entry. None
+                inherits from the parent, else the class default (False for
+                classes that declare ``_tracking_fields``).
 
         Returns:
             None
 
         """
+        record_kwargs: dict[str, Any] = {}
+        if tracking_record_init is not None:
+            record_kwargs["tracking_record_init"] = tracking_record_init
         TrackBase.__init__(
             self,
             tracking_auto_convert=tracking_auto_convert,
@@ -97,10 +133,27 @@ class TrackedAttr(TrackBase):
             tracking_delimiter=".",
             tracking_capture_snapshots=tracking_capture_snapshots,
             tracking_capture_stack=tracking_capture_stack,
+            **record_kwargs,
         )
         self._tracking_attributes_to_monitor: list[str] = []
         self._tracking_locked_attributes: list[str] = []
         self._tracking_original_values: dict[str, Any] = {}
+        for name in self._tracking_declared_fields:
+            if name in self.__dict__ or hasattr(type(self), name):
+                self._tracking_start_declared_field(name, getattr(self, name))
+
+    def _tracking_start_declared_field(self, attribute_name: str, value: Any) -> None:
+        """Begin monitoring a declared field without recording an entry.
+
+        Args:
+            attribute_name: The declared field name.
+            value: The value being assigned; converted when auto-convert is on.
+
+        """
+        self._tracking_attributes_to_monitor.append(attribute_name)
+        value = self._tracking_convert_value(value, attribute_name)
+        object.__setattr__(self, attribute_name, value)
+        self._tracking_original_values[attribute_name] = value
 
     def _tracking_is_tracking_attribute(self, attribute_name: str) -> bool:
         """Check if the specified attribute is being tracked.
@@ -411,6 +464,22 @@ class TrackedAttr(TrackBase):
             RuntimeError: If the attribute is locked and cannot be modified.
 
         """
+        if attribute_name.startswith("_tracking_"):
+            object.__setattr__(self, attribute_name, value)
+            return
+        monitored = self.__dict__.get("_tracking_attributes_to_monitor")
+        if monitored is None or attribute_name not in monitored:
+            if monitored is not None and attribute_name in self._tracking_declared_fields:
+                if self._tracking_locked:
+                    raise RuntimeError(
+                        f"{self.__class__.__name__}.{attribute_name} is locked and "
+                        "cannot be modified."
+                    )
+                self._tracking_start_declared_field(attribute_name, value)
+                return
+            object.__setattr__(self, attribute_name, value)
+            return
+
         if self._tracking_is_locked_attribute(attribute_name):
             raise RuntimeError(
                 f"{self.__class__.__name__}.{attribute_name} is locked and cannot be modified."

@@ -73,6 +73,7 @@ class TrackedDict(TrackBase, dict):
         tracking_location: str | None = "",
         tracking_capture_snapshots: bool | None = None,
         tracking_capture_stack: bool | None = None,
+        tracking_record_init: bool | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the tracked dictionary with optional tracking parameters.
@@ -88,6 +89,7 @@ class TrackedDict(TrackBase, dict):
             tracking_auto_convert: Boolean flag to enable/disable auto-conversion.
             tracking_parent: Optional parent tracking object.
             tracking_location: Optional string for tracking location context.
+            tracking_record_init: Whether to record the ``init`` entry; None inherits.
             **kwargs: Keyword arguments to initialize the dictionary.
 
         """
@@ -97,6 +99,8 @@ class TrackedDict(TrackBase, dict):
             tracking_kwargs["tracking_capture_snapshots"] = tracking_capture_snapshots
         if tracking_capture_stack is not None:
             tracking_kwargs["tracking_capture_stack"] = tracking_capture_stack
+        if tracking_record_init is not None:
+            tracking_kwargs["tracking_record_init"] = tracking_record_init
         TrackBase.__init__(
             self,
             tracking_auto_converted_in=tracking_auto_converted_in,

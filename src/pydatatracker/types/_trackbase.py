@@ -212,6 +212,8 @@ class TrackBase:
 
     """
 
+    _tracking_record_init: bool = True
+
     def __init__(
         self,
         tracking_name: str | None = None,
@@ -239,6 +241,10 @@ class TrackBase:
             tracking_location: The location of the tracked attribute.
             tracking_delimiter: The delimiter used for tracking attribute locations.
             **kwargs: Additional keyword arguments for further customization.
+                ``tracking_record_init`` controls whether the ``init`` change entry
+                (with the full ``init_data`` repr) is recorded. When omitted it is
+                inherited from ``tracking_parent``, else from the class default
+                ``_tracking_record_init`` (True).
 
         Returns:
             None
@@ -266,6 +272,11 @@ class TrackBase:
             self._tracking_capture_stack = getattr(
                 tracking_parent, "_tracking_capture_stack", False
             )
+            self._tracking_record_init = getattr(
+                tracking_parent, "_tracking_record_init", type(self)._tracking_record_init
+            )
+        if kwargs.get("tracking_record_init") is not None:
+            self._tracking_record_init = kwargs["tracking_record_init"]
         if "tracking_capture_snapshots" in kwargs:
             self._tracking_capture_snapshots = kwargs["tracking_capture_snapshots"]
         if "tracking_capture_stack" in kwargs:
@@ -273,7 +284,8 @@ class TrackBase:
         if tracking_parent:
             tracking_parent._tracking_add_child_tracked_item(tracking_location, self)
 
-        self.tracking_create_change(action="init", init_data=f"{self}")
+        if self._tracking_record_init:
+            self.tracking_create_change(action="init", init_data=f"{self}")
         self._tracking_convert_all_values()
 
     def _tracking_convert_value(self, value: Any, location: Any = "") -> Any:
