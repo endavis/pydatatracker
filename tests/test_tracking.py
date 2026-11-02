@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import time
+import types
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ from pydatatracker.observers import (
     json_file_observer,
     logging_observer,
 )
+from pydatatracker.utils import changelog
 from pydatatracker.utils.changelog import ChangeLogEntry
 
 
@@ -221,3 +223,37 @@ def test_async_queue_observer_synchronous_queue() -> None:
     tracked.tracking_add_observer(observer)
     tracked["foo"] = "bar"
     assert queue.items
+
+
+def test_changes_since_is_ordered_when_the_clock_does_not_advance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Entries created at the same clock reading still get distinct, ordered timestamps.
+
+    Windows' clock resolution let `init` and the first assignment share a timestamp, so
+    `changes_since(first_entry)` also returned `init`.
+    """
+    frozen = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
+
+    class FrozenClock:
+        @staticmethod
+        def now(tz: datetime.tzinfo | None = None) -> datetime.datetime:
+            return frozen.astimezone(tz)
+
+    clock = types.SimpleNamespace(
+        datetime=FrozenClock, UTC=datetime.UTC, timedelta=datetime.timedelta
+    )
+    monkeypatch.setattr(changelog, "datetime", clock)
+    monkeypatch.setattr(changelog, "_last_timestamp", frozen - datetime.timedelta(seconds=1))
+
+    tracked = TrackedDict()
+    tracked["alpha"] = 1
+    first_entry = tracked.last_change()
+    assert first_entry is not None
+    tracked["beta"] = 2
+
+    times = [entry.created_time for entry in tracked.tracking_changes()]
+    assert times == sorted(times)
+    assert len(set(times)) == len(times)
+    locations = [entry.extra["location"] for entry in tracked.changes_since(first_entry)]
+    assert locations == ["alpha", "beta"]

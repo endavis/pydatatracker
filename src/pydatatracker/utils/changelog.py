@@ -41,6 +41,7 @@ import ast
 import datetime
 import inspect
 import pprint
+import threading
 from typing import Any
 from uuid import uuid4
 
@@ -50,6 +51,30 @@ from uuid import uuid4
 
 # Globals
 _IGNORE_IN_STACK: list[str] = []
+_TIMESTAMP_LOCK = threading.Lock()
+_last_timestamp = datetime.datetime.min.replace(tzinfo=datetime.UTC)
+_ONE_MICROSECOND = datetime.timedelta(microseconds=1)
+
+
+def _next_timestamp() -> datetime.datetime:
+    """Return a UTC timestamp strictly later than any previously returned one.
+
+    The system clock can return the same value for consecutive calls (on Windows
+    its resolution is coarse enough that a burst of changes shares one value), and
+    change history is ordered and filtered by ``created_time``. Bumping a tied or
+    earlier reading by one microsecond keeps the order of entries total.
+
+    Returns:
+        The current UTC time, or one microsecond past the previous timestamp if the
+        clock has not advanced.
+    """
+    global _last_timestamp
+    with _TIMESTAMP_LOCK:
+        now = datetime.datetime.now(datetime.UTC)
+        if now <= _last_timestamp:
+            now = _last_timestamp + _ONE_MICROSECOND
+        _last_timestamp = now
+        return now
 
 
 def add_to_ignore_in_stack(tlist: list[str]) -> None:
@@ -116,7 +141,7 @@ class ChangeLogEntry:
         self.tracked_item_uuid = item_uuid
         self.extra = kwargs
         self.header_column_width = 17
-        self.created_time = datetime.datetime.now(datetime.UTC)
+        self.created_time = _next_timestamp()
         actor = self.extra.pop("actor", None)
         if capture_stack and actor is None:
             self.stack = self.get_stack()
