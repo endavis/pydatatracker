@@ -44,6 +44,7 @@ Classes:
 # Standard Library
 import datetime
 import logging
+import weakref
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, Literal
@@ -166,6 +167,40 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+class _ObserverRef:
+    """Holds an observer weakly (or strongly) and resolves it on demand."""
+
+    def __init__(self, observer: Callable[..., Any], weak: bool = False) -> None:
+        self._strong: Callable[..., Any] | None = None
+        self._weak: weakref.ref[Any] | weakref.WeakMethod[Any] | None = None
+        if not weak:
+            self._strong = observer
+            return
+        try:
+            if hasattr(observer, "__self__") and hasattr(observer, "__func__"):
+                self._weak = weakref.WeakMethod(observer)
+            else:
+                self._weak = weakref.ref(observer)
+        except TypeError:
+            # Not weakly referenceable (builtins, some callables): hold strongly.
+            self._strong = observer
+
+    def get(self) -> Callable[..., Any] | None:
+        """Return the observer, or None if it has been garbage collected."""
+        if self._strong is not None:
+            return self._strong
+        return self._weak() if self._weak is not None else None
+
+    def alive(self) -> bool:
+        """Return True while the observer can still be called."""
+        return self.get() is not None
+
+    def matches(self, observer: Callable[..., Any]) -> bool:
+        """Return True if the referenced observer equals the given one."""
+        current = self.get()
+        return current is not None and current == observer
+
+
 class TrackBase:
     """Base class for tracking changes to objects.
 
@@ -212,7 +247,7 @@ class TrackBase:
         self._tracking_name = tracking_name
         self._tracking_auto_converted_in = tracking_auto_converted_in
         self._tracking_uuid = uuid4().hex
-        self._tracking_observers: dict[int, list[Callable[..., Any]]] = {}
+        self._tracking_observers: dict[int, list[_ObserverRef]] = {}
         self._tracking_context: dict[str, Any] = {}
         self._tracking_changes: list[ChangeLogEntry] = []
         self._tracking_locked = False
@@ -310,7 +345,7 @@ class TrackBase:
             trackable_item.lock()
         else:
             trackable_item.unlock()
-        trackable_item.tracking_add_observer(self._tracking_notify_observers)
+        trackable_item.tracking_add_observer(self._tracking_notify_observers, weak=True)
 
     def _tracking_remove_child_tracked_item(self, trackable_item: "TrackBase") -> None:
         """Remove a child tracked item from the current instance.
@@ -348,46 +383,56 @@ class TrackBase:
         """
         raise NotImplementedError
 
-    def tracking_add_observer(self, observer: Callable, priority: int = 50) -> None:
+    def tracking_add_observer(
+        self, observer: Callable, priority: int = 50, weak: bool = False
+    ) -> None:
         """Add an observer to the list of observers for tracking changes.
 
-        This method registers a specified observer function to receive notifications
-        about changes to a tracked object. Observers are notified in the order of
-        their priority, with lower priority values indicating higher precedence.
+        Observers are notified in the order of their priority, with lower priority
+        values notified first.
+
+        By default the observer is held by a strong reference. With ``weak=True`` it is
+        held by ``weakref.WeakMethod`` (bound methods) or ``weakref.ref`` (other
+        callables), so registering it does not keep it alive; once collected it is
+        dropped silently during notification. Callables that cannot be weakly
+        referenced fall back to a strong reference. A weakly registered temporary
+        lambda with no other reference is dropped. The parent-to-child link between
+        tracked objects is registered weakly so parents and children do not form a
+        reference cycle.
 
         Args:
-            observer: The function to be added as an observer.
+            observer: The callable to be added as an observer.
             priority: The priority level of the observer.
+            weak: Hold only a weak reference to the observer.
 
         Returns:
             None
 
         """
-        if priority not in self._tracking_observers:
-            self._tracking_observers[priority] = []
-        if (
-            observer not in self._tracking_observers[priority]
-            and observer != self._tracking_notify_observers
-        ):
-            self._tracking_observers[priority].append(observer)
+        entries = self._tracking_observers.setdefault(priority, [])
+        if observer == self._tracking_notify_observers:
+            return
+        if any(entry.matches(observer) for entry in entries):
+            return
+        entries.append(_ObserverRef(observer, weak=weak))
 
     def tracking_remove_observer(self, observer: Callable) -> None:
         """Remove an observer from the list of observers for tracking changes.
 
-        This method unregisters a previously added observer function, ensuring that
-        it will no longer receive notifications about changes to tracked attributes.
-        It searches through the priority levels to find and remove the observer.
+        Observers are matched by equality, so a bound method removes the entry
+        registered from an equal bound method. Dead weak references are pruned too.
 
         Args:
-            observer: The function to be removed from the list of observers.
+            observer: The callable to be removed from the list of observers.
 
         Returns:
             None
 
         """
-        for priority in self._tracking_observers:
-            if observer in self._tracking_observers[priority]:
-                self._tracking_observers[priority].remove(observer)
+        for priority, entries in self._tracking_observers.items():
+            self._tracking_observers[priority] = [
+                entry for entry in entries if entry.alive() and not entry.matches(observer)
+            ]
 
     def tracking_changes(self, most_recent: int | None = None) -> list[ChangeLogEntry]:
         """Return a copy of the recorded change log entries.
@@ -444,7 +489,13 @@ class TrackBase:
         """
         priorities = sorted(self._tracking_observers.keys())
         for priority in priorities:
-            for observer in self._tracking_observers[priority]:
+            entries = self._tracking_observers[priority]
+            for entry in list(entries):
+                observer = entry.get()
+                if observer is None:
+                    if entry in entries:
+                        entries.remove(entry)
+                    continue
                 observer(change_log_entry)
 
     def tracking_create_change(self, **kwargs: Any) -> None:

@@ -74,6 +74,10 @@ tracked["mode"] = "debug"
 print(collector.as_list()[-1].extra["location"])  # mode
 ```
 
+Observers are held strongly by default. Pass `weak=True` to `tracking_add_observer` to hold
+them weakly (they are dropped silently once garbage collected). The parent-to-child link between
+tracked objects is always weak.
+
 `async_queue_observer` pushes changes onto an `asyncio.Queue`, and `telemetry_observer()` wraps a
 Prometheus-compatible counter to increment labels per action. Observer lists can also be defined
 in JSON and loaded with `pydatatracker.config.load_observers_from_json`.
