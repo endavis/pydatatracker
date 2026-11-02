@@ -22,7 +22,7 @@ Instead, please report them via one of the following methods:
 
 ### Alternative: Email
 
-Send an email to: your.email@example.com
+Send an email to: endavis.github@endavis.net
 
 Include as much information as possible:
 - Type of vulnerability
@@ -135,7 +135,7 @@ We recognize security researchers who help us keep this project secure:
 
 ## Questions?
 
-If you have questions about this security policy, please open a GitHub issue with the "security" label or contact us at your.email@example.com.
+If you have questions about this security policy, please open a GitHub issue with the "security" label or contact us at endavis.github@endavis.net.
 
 ---
 
