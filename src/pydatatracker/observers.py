@@ -15,6 +15,8 @@ from typing import Any
 from .exporters import HttpExporter, JsonLinesExporter, KafkaExporter, S3Exporter
 from .utils.changelog import ChangeLogEntry
 
+_background_tasks: set[asyncio.Task[None]] = set()
+
 
 class ChangeCollector:
     """Callable observer that stores incoming change log entries in memory."""
@@ -74,12 +76,18 @@ class ChangeCollector:
 class FilteredObserver:
     """Wraps another observer, only forwarding matching changes."""
 
-    def __init__(self, observer, *, actions=None, locations=None):
+    def __init__(
+        self,
+        observer: Callable[[ChangeLogEntry], Any],
+        *,
+        actions: Iterable[str] | None = None,
+        locations: Iterable[str] | None = None,
+    ) -> None:
         self.observer = observer
         self.actions = set(actions or [])
         self.locations = set(locations or [])
 
-    def __call__(self, change):
+    def __call__(self, change: ChangeLogEntry) -> Any:
         if self.actions and change.extra.get("action") not in self.actions:
             return
         location = change.extra.get("location")
@@ -88,7 +96,14 @@ class FilteredObserver:
         return self.observer(change)
 
 
-def filtered_observer(observer, *, actions=None, locations=None):
+def filtered_observer(
+    observer: Callable[[ChangeLogEntry], Any],
+    *,
+    actions: Iterable[str] | None = None,
+    locations: Iterable[str] | None = None,
+) -> FilteredObserver:
+    """Create a FilteredObserver wrapping ``observer``."""
+
     return FilteredObserver(observer, actions=actions, locations=locations)
 
 
@@ -121,14 +136,13 @@ def json_file_observer(path: str | Path) -> Callable[[ChangeLogEntry], None]:
     return _observer
 
 
-_background_tasks: set[asyncio.Task[None]] = set()
+def async_queue_observer(queue: Any) -> Callable[[ChangeLogEntry], None]:
+    """Create an observer that pushes serialized changes onto a (async) queue."""
 
-
-def async_queue_observer(queue):
-    async def _async_enqueue(change):
+    async def _async_enqueue(change: ChangeLogEntry) -> None:
         await queue.put(change.to_dict())
 
-    def _observer(change):
+    def _observer(change: ChangeLogEntry) -> None:
         if inspect.iscoroutinefunction(queue.put):
             task = asyncio.create_task(_async_enqueue(change))
             _background_tasks.add(task)
@@ -178,7 +192,8 @@ def build_observer_from_config(config: dict[str, Any]) -> Callable[[ChangeLogEnt
 def _resolve_callable(path: str) -> Callable[..., Any]:
     module, attr = path.rsplit(".", 1)
     mod = import_module(module)
-    return getattr(mod, attr)
+    resolved: Callable[..., Any] = getattr(mod, attr)
+    return resolved
 
 
 class MetricsObserver:

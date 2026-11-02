@@ -82,7 +82,8 @@ class TrackedAttr(TrackBase):
                 values.
             tracking_parent: The parent TrackBase instance for hierarchical tracking.
             tracking_location: The location identifier for the tracked attribute.
-            tracking_delimiter: The delimiter used to separate tracking locations.
+            tracking_capture_snapshots: Whether to capture before/after repr snapshots.
+            tracking_capture_stack: Whether to capture stack traces for changes.
 
         Returns:
             None
@@ -97,9 +98,9 @@ class TrackedAttr(TrackBase):
             tracking_capture_snapshots=tracking_capture_snapshots,
             tracking_capture_stack=tracking_capture_stack,
         )
-        self._tracking_attributes_to_monitor = []
-        self._tracking_locked_attributes = []
-        self._tracking_original_values = {}
+        self._tracking_attributes_to_monitor: list[str] = []
+        self._tracking_locked_attributes: list[str] = []
+        self._tracking_original_values: dict[str, Any] = {}
 
     def _tracking_is_tracking_attribute(self, attribute_name: str) -> bool:
         """Check if the specified attribute is being tracked.
@@ -282,7 +283,7 @@ class TrackedAttr(TrackBase):
         return self._tracking_original_values.get(attribute_name, None)
 
     @track_changes
-    def _tracking_lock_attribute(self, attribute_name) -> None:
+    def _tracking_lock_attribute(self, attribute_name: str) -> None:
         """Lock a specified attribute to prevent modifications.
 
         This method adds the given attribute name to the list of locked attributes,
@@ -421,9 +422,8 @@ class TrackedAttr(TrackBase):
         except AttributeError:
             original_value = "#!NotSet"
 
-        if (
-            not self._tracking_is_tracking_attribute(attribute_name)
-            or not (self._tracking_is_locked_attribute(attribute_name))
+        if not self._tracking_is_tracking_attribute(attribute_name) or (
+            not (self._tracking_is_locked_attribute(attribute_name))
             and (hasattr(self, "_tracking_locked") and not self._tracking_locked)
         ):
             if self._tracking_is_tracking_attribute(attribute_name):

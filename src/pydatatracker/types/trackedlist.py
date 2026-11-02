@@ -86,7 +86,7 @@ class TrackedList(TrackBase, list):
         if data is None:
             data = []
         list.__init__(self, data)
-        extra_kwargs = {}
+        extra_kwargs: dict[str, Any] = {}
         if tracking_capture_snapshots is not None:
             extra_kwargs["tracking_capture_snapshots"] = tracking_capture_snapshots
         if tracking_capture_stack is not None:
@@ -239,7 +239,7 @@ class TrackedList(TrackBase, list):
             >>> tracked_list.append('a')  # Append is tracked
 
         """
-        index = "none"
+        index: str | int = "none"
 
         if not self._tracking_locked:
             index = len(self)
@@ -570,6 +570,6 @@ class TrackedList(TrackBase, list):
             return {
                 "type": self._tracking_is_trackable(self),
                 "uuid": self._tracking_uuid,
-                "location": f"[{repr(location)}]",
+                "location": f"[{location!r}]",
             }
         return {"type": self._tracking_is_trackable(self), "uuid": self._tracking_uuid}

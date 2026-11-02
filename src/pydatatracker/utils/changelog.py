@@ -41,6 +41,7 @@ import ast
 import datetime
 import inspect
 import pprint
+from typing import Any
 from uuid import uuid4
 
 # 3rd Party
@@ -48,7 +49,7 @@ from uuid import uuid4
 # Project
 
 # Globals
-_IGNORE_IN_STACK = []
+_IGNORE_IN_STACK: list[str] = []
 
 
 def add_to_ignore_in_stack(tlist: list[str]) -> None:
@@ -93,7 +94,7 @@ class ChangeLogEntry:
 
     """
 
-    def __init__(self, item_uuid: str, *, capture_stack: bool = True, **kwargs) -> None:
+    def __init__(self, item_uuid: str, *, capture_stack: bool = True, **kwargs: Any) -> None:
         """Initialize a new ChangeLogEntry instance.
 
         Creates a new change log entry with a unique identifier and metadata. Sets up
@@ -123,7 +124,7 @@ class ChangeLogEntry:
         else:
             self.stack = []
             self.actor = actor or ""
-        self.tree = []
+        self.tree: list[Any] = []
         for item in self.extra:
             if item == "location":
                 continue
@@ -147,7 +148,7 @@ class ChangeLogEntry:
 
     def get_stack(self) -> list[str]:
         """Retrieve the current stack trace in a lightweight manner."""
-        stack = []
+        stack: list[str] = []
         frame = inspect.currentframe()
         if not frame:
             return stack
@@ -204,11 +205,7 @@ class ChangeLogEntry:
             True if this entry was created earlier than the other, False otherwise
 
         """
-        return (
-            self.created_time < value.created_time  # type: ignore
-            if hasattr(value, "created_time")
-            else False
-        )
+        return self.created_time < value.created_time if hasattr(value, "created_time") else False
 
     def copy(self, new_type: str, new_item_uuid: str) -> "ChangeLogEntry":
         """Create a copy of this ChangeLogEntry with a new type and UUID.
@@ -305,7 +302,7 @@ class ChangeLogEntry:
 
         return tmsg
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the change log entry to a JSON-friendly dict."""
         return {
             "uuid": self.uuid,

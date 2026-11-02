@@ -40,14 +40,14 @@ from ._version import __version__
 from .types._trackbase import TrackBase  # noqa: F401
 
 __all__ = [
+    "ChangeCollector",
+    "ChangeLogEntry",
+    "TrackedAttr",
     "TrackedDict",
     "TrackedList",
-    "TrackedAttr",
-    "ChangeLogEntry",
-    "add_to_ignore_in_stack",
-    "ChangeCollector",
-    "tracking_actor",
     "__version__",
+    "add_to_ignore_in_stack",
+    "tracking_actor",
 ]
 
 from .observers import ChangeCollector

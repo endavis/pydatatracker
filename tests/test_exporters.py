@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from pydatatracker import TrackedDict
 from pydatatracker.exporters import HttpExporter, JsonLinesExporter, KafkaExporter, S3Exporter
+from pydatatracker.utils.changelog import ChangeLogEntry
 
 
-def _make_change():
+def _make_change() -> ChangeLogEntry:
     tracked = TrackedDict()
     tracked["foo"] = "bar"
-    return tracked.last_change()
+    change = tracked.last_change()
+    assert change is not None
+    return change
 
 
 def test_json_lines_exporter(tmp_path: Path) -> None:
@@ -24,10 +30,10 @@ def test_json_lines_exporter(tmp_path: Path) -> None:
     assert json.loads(data[0])["extra"]["location"] == "foo"
 
 
-def test_http_exporter_invokes_post(monkeypatch) -> None:
-    captured = {}
+def test_http_exporter_invokes_post(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
 
-    def fake_post(url, json=None, **kwargs):
+    def fake_post(url: str, json: dict[str, Any] | None = None, **kwargs: object) -> None:
         captured["url"] = url
         captured["json"] = json
 
@@ -37,12 +43,12 @@ def test_http_exporter_invokes_post(monkeypatch) -> None:
     assert captured["json"]["extra"]["location"] == "foo"
 
 
-def test_s3_exporter(monkeypatch, tmp_path: Path) -> None:
+def test_s3_exporter(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     class Client:
-        def __init__(self):
-            self.calls = []
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
 
-        def put_object(self, **kwargs):
+        def put_object(self, **kwargs: object) -> None:
             self.calls.append(kwargs)
 
     client = Client()
@@ -54,10 +60,10 @@ def test_s3_exporter(monkeypatch, tmp_path: Path) -> None:
 
 def test_kafka_exporter() -> None:
     class Producer:
-        def __init__(self):
-            self.messages = []
+        def __init__(self) -> None:
+            self.messages: list[tuple[str, bytes]] = []
 
-        def send(self, topic, payload):
+        def send(self, topic: str, payload: bytes) -> None:
             self.messages.append((topic, payload))
 
     producer = Producer()

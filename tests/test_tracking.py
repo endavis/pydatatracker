@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import time
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,7 @@ from pydatatracker.observers import (
     json_file_observer,
     logging_observer,
 )
+from pydatatracker.utils.changelog import ChangeLogEntry
 
 
 def test_tracked_dict_logs_updates() -> None:
@@ -135,9 +137,9 @@ def test_change_collector_observer_records_events() -> None:
 
 def test_filtered_observer_filters_events() -> None:
     tracked = TrackedDict()
-    collected = []
+    collected: list[object] = []
 
-    def observer(change):
+    def observer(change: ChangeLogEntry) -> None:
         collected.append(change.extra.get("location"))
 
     filtered = FilteredObserver(observer, actions={"update"}, locations={"foo"})
@@ -161,7 +163,7 @@ def test_change_log_entry_to_dict() -> None:
     assert serialized["created_time"].endswith("Z") or serialized["created_time"].count(":") >= 2
 
 
-def test_json_file_observer_writes_changes(tmp_path) -> None:
+def test_json_file_observer_writes_changes(tmp_path: Path) -> None:
     tracked = TrackedDict()
     file_path = tmp_path / "log.jsonl"
 
@@ -174,7 +176,7 @@ def test_json_file_observer_writes_changes(tmp_path) -> None:
     assert "foo" in lines[0]
 
 
-def test_logging_observer_uses_logger(caplog) -> None:
+def test_logging_observer_uses_logger(caplog: pytest.LogCaptureFixture) -> None:
     tracked = TrackedDict()
     logger = logging.getLogger("pydatatracker.tests")
     observer = logging_observer(logger)
@@ -186,14 +188,14 @@ def test_logging_observer_uses_logger(caplog) -> None:
     assert any("foo" in record.message for record in caplog.records)
 
 
-def test_async_queue_observer_handles_coroutines():
+def test_async_queue_observer_handles_coroutines() -> None:
     tracked = TrackedDict()
 
     class DummyQueue:
-        def __init__(self):
-            self.items = []
+        def __init__(self) -> None:
+            self.items: list[object] = []
 
-        def put(self, value):
+        def put(self, value: object) -> None:
             self.items.append(value)
 
     queue = DummyQueue()
@@ -204,14 +206,14 @@ def test_async_queue_observer_handles_coroutines():
     assert queue.items
 
 
-def test_async_queue_observer_synchronous_queue():
+def test_async_queue_observer_synchronous_queue() -> None:
     tracked = TrackedDict()
 
     class SyncQueue:
-        def __init__(self):
-            self.items = []
+        def __init__(self) -> None:
+            self.items: list[object] = []
 
-        def put(self, value):
+        def put(self, value: object) -> None:
             self.items.append(value)
 
     queue = SyncQueue()
