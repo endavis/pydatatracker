@@ -305,7 +305,9 @@ name = "cz_conventional_commits"
 version = "0.0.0"
 tag_format = "v$version"
 version_provider = "scm"
-update_changelog_on_bump = true
+# CHANGELOG.md is hand-written (Keep a Changelog). With this false, `doit release` renames
+# `## [Unreleased]` to the release version instead of regenerating the file from commits.
+update_changelog_on_bump = false
 major_version_zero = true
 merge_prerelease = true
 bump_pattern = "^(feat|fix|refactor|perf)"
