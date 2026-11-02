@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793647373439,
+  "lastUpdate": 1793651942406,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -156,6 +156,58 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000387068494922279",
             "extra": "mean: 2.0260674543687296 msec\nrounds: 515"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9cb5ca5a0a3492af11de5c74cc12c038e5ec35d9",
+          "message": "chore: synchronize with pyproject-template f85f7a6 (merges PR #18, addresses #17)\n\nSyncs the following template improvements (bed58ba...f85f7a6):\n- endavis/pyproject-template#1181 (configure.py no longer deletes itself\n  while `__init__` and manage.py still import it)\n- endavis/pyproject-template#1182 (doc-path test exempts worked-example\n  modules in any package name via `ALLOWED_PATTERNS`)\n- endavis/pyproject-template#1183 (configurator prints the migration guide's\n  step 6 cleanup during a migration)\n- endavis/pyproject-template#1185 (factory_boy example uses `username`\n  instead of the substituted `__GH_OWNER__`)\n- endavis/pyproject-template#1187 (.gitignore covers SQLite's `.doit.db-wal`\n  and `.doit.db-shm`)\n- endavis/pyproject-template#1189 (major_version_zero release tests no longer\n  read the project's real CHANGELOG.md)\n\nLocal follow-ups from the approved plan:\n- Drop the `cache`/`provider`/`farewell` entries from `sync-exclude.toml`;\n  `ALLOWED_PATTERNS` now covers them.\n- Record `f85f7a6` as the sync point.\n\nSkipped: the template repository's own README.md change, README.template.md,\nthe template-owned configure tests (ADR-9017), and examples/api/tests.\n\nRefs #17\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-02T20:38:10Z",
+          "tree_id": "b6cb20fdadd8646952ef7e0145bb0feab4790cec",
+          "url": "https://github.com/endavis/pydatatracker/commit/9cb5ca5a0a3492af11de5c74cc12c038e5ec35d9"
+        },
+        "date": 1793651941714,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 264.1292338558882,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000571141651192138",
+            "extra": "mean: 3.786025444444408 msec\nrounds: 270"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 113.74055056007623,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0001646929131120955",
+            "extra": "mean: 8.791939155172399 msec\nrounds: 116"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 259.1938374259751,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004142690088558363",
+            "extra": "mean: 3.8581164194754307 msec\nrounds: 267"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 268.732708139165,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004514427737385995",
+            "extra": "mean: 3.721169659340996 msec\nrounds: 273"
           }
         ]
       }
