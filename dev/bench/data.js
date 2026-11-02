@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793656158352,
+  "lastUpdate": 1793657570129,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -364,6 +364,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003586343996740911",
             "extra": "mean: 2.387593528604215 msec\nrounds: 437"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2af279c93198b07c547d2262c95f61be89aa7e00",
+          "message": "fix: check recorded changes by UUID set instead of scanning the log (merges PR #21, addresses #1)\n\n_tracking_notify_observers in TrackedDict, TrackedList and TrackedAttr\nchecked `entry not in self._tracking_changes`, a linear scan calling\nChangeLogEntry.__eq__ (which compares uuid) on every recorded change, so\neach change cost grew with history length.\n\nTrackBase now keeps a _tracking_change_uuids set next to the list, and\nevery append goes through _tracking_record_change, so the two cannot\ndiverge. Membership semantics are unchanged.\n\nAddresses #1\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-02T22:11:59Z",
+          "tree_id": "fbe78e89318dc862bdc8728725a5ffdd7fcaeb00",
+          "url": "https://github.com/endavis/pydatatracker/commit/2af279c93198b07c547d2262c95f61be89aa7e00"
+        },
+        "date": 1793657569547,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 568.2827687042142,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000024850188971569744",
+            "extra": "mean: 1.7596873512110494 msec\nrounds: 578"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 184.6528119573044,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004361923859109433",
+            "extra": "mean: 5.415568760638322 msec\nrounds: 188"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 565.8530349197381,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004190604251136311",
+            "extra": "mean: 1.7672433269565169 msec\nrounds: 575"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 588.4169623376337,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002673112074627372",
+            "extra": "mean: 1.6994751409395976 msec\nrounds: 596"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[100]",
+            "value": 109999.30333390605,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4366989784811525e-7",
+            "extra": "mean: 9.090966666983984 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[1000]",
+            "value": 62707.32609647719,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000030374993501751805",
+            "extra": "mean: 15.947100000109533 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[10000]",
+            "value": 27209.452926401682,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008189466523350715",
+            "extra": "mean: 36.751933333789566 usec\nrounds: 30"
           }
         ]
       }
