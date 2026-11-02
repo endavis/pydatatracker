@@ -50,3 +50,23 @@ def test_bench_trackedlist_append(benchmark: Any) -> None:
         return items
 
     benchmark(run)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("history", [100, 1_000, 10_000])
+def test_bench_trackedlist_append_with_history(benchmark: Any, history: int) -> None:
+    """Benchmark one TrackedList append after `history` changes are already recorded.
+
+    Each round gets a fresh list so the history stays at `history` instead of growing.
+    """
+
+    def setup() -> tuple[tuple[TrackedList], dict[str, Any]]:
+        items = TrackedList()
+        for i in range(history):
+            items.append(i)
+        return (items,), {}
+
+    def append_one(items: TrackedList) -> None:
+        items.append(0)
+
+    benchmark.pedantic(append_one, setup=setup, rounds=30, iterations=1)

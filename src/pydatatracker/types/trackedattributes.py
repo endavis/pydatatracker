@@ -176,8 +176,7 @@ class TrackedAttr(TrackBase):
 
                     break
 
-        if change_log_entry not in self._tracking_changes:
-            self._tracking_changes.append(change_log_entry)
+        self._tracking_record_change(change_log_entry)
         super()._tracking_notify_observers(change_log_entry)
 
     def tracking_add_attribute_to_monitor(self, attribute_name: str) -> None:
