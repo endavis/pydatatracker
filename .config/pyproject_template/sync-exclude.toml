@@ -16,9 +16,4 @@ exclude = [
     "tests/template/test_utils.py",
     "tests/template/test_utils_properties.py",
     "tests/template/test_check_template_updates.py",
-    # Worked-example paths in template docs; configure.py substitutes the package
-    # name into them, so the doc-path allowlist entry `src/__PACKAGE_NAME__/` misses.
-    "src/pydatatracker/cache.py",
-    "src/pydatatracker/provider.py",
-    "src/pydatatracker/farewell.py",
 ]
