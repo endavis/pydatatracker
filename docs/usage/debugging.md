@@ -32,6 +32,14 @@ change = payload.last_change()
 print(change.extra["data_pre_change"], change.stack)
 ```
 
+## Observer references
+Observers are held by strong reference by default. Pass `weak=True` to
+`tracking_add_observer` to hold a bound method (`WeakMethod`) or other callable (`weakref.ref`)
+weakly: it is dropped silently once garbage collected, so a weakly registered temporary lambda
+with no other reference stops being called. Callables that cannot be weakly referenced are held
+strongly. The link a parent registers on each child is weak, so a parent and its children are
+freed together without waiting for the cycle collector.
+
 ## Collect change events via observers
 ```python
 from pydatatracker import ChangeCollector
