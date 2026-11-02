@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793654838146,
+  "lastUpdate": 1793656158352,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -312,6 +312,58 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00006076016466307872",
             "extra": "mean: 3.1618592515149166 msec\nrounds: 330"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c27f70ccf0c9438f72f3b5e6671b15339c9112b",
+          "message": "fix: register parent-child observer link weakly to break reference cycle (merges PR #20, addresses #4)\n\nThe parent registered its bound _tracking_notify_observers on each tracked\nchild, so parent and child kept each other alive until the cyclic GC ran.\nThe child now holds that link through weakref.WeakMethod.\n\ntracking_add_observer gains weak=False. External observers stay strongly\nheld by default; weak=True stores WeakMethod/weakref.ref (strong fallback\nfor non-weakrefable callables), and dead references are dropped silently\nduring notification. Priority order, de-duplication and removal by\nequality are unchanged.\n\nAddresses #4\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-02T21:45:54Z",
+          "tree_id": "a656c9a722995236d3dc52a20de06fcb38105677",
+          "url": "https://github.com/endavis/pydatatracker/commit/7c27f70ccf0c9438f72f3b5e6671b15339c9112b"
+        },
+        "date": 1793656157752,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 413.25969045649555,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00010919847536145721",
+            "extra": "mean: 2.4197859677419262 msec\nrounds: 434"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 178.66001864454162,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000734862477803635",
+            "extra": "mean: 5.597223192893424 msec\nrounds: 197"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 420.77305742723536,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000036660595117702654",
+            "extra": "mean: 2.3765780207372966 msec\nrounds: 434"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 418.83176010474403,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003586343996740911",
+            "extra": "mean: 2.387593528604215 msec\nrounds: 437"
           }
         ]
       }
