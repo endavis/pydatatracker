@@ -6,6 +6,7 @@ import json
 import uuid
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from .utils.changelog import ChangeLogEntry
 
@@ -47,7 +48,7 @@ class HttpExporter(BaseExporter):
 class S3Exporter(BaseExporter):
     """Upload serialized change dicts to S3-compatible storage."""
 
-    def __init__(self, client: object, bucket: str, prefix: str = "changes/") -> None:
+    def __init__(self, client: Any, bucket: str, prefix: str = "changes/") -> None:
         self.client = client
         self.bucket = bucket
         self.prefix = prefix.rstrip("/") + "/"
@@ -61,7 +62,7 @@ class S3Exporter(BaseExporter):
 class KafkaExporter(BaseExporter):
     """Send serialized change dicts to a Kafka-like producer."""
 
-    def __init__(self, producer: object, topic: str) -> None:
+    def __init__(self, producer: Any, topic: str) -> None:
         self.producer = producer
         self.topic = topic
 

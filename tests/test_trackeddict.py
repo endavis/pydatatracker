@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pydatatracker import TrackedDict
+from pydatatracker.utils.changelog import ChangeLogEntry
 
 
-def _latest_change(tracked: TrackedDict):
+def _latest_change(tracked: TrackedDict) -> ChangeLogEntry:
     return tracked.tracking_changes()[-1]
 
 

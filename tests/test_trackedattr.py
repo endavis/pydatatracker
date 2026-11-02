@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from pydatatracker import TrackedAttr, TrackedDict
+from pydatatracker.utils.changelog import ChangeLogEntry
 
 
 class SampleTrackedAttr(TrackedAttr):
@@ -18,7 +19,7 @@ class SampleTrackedAttr(TrackedAttr):
         self.tracking_add_attribute_to_monitor("profile")
 
 
-def _latest_change(tracked: TrackedAttr):
+def _latest_change(tracked: TrackedAttr) -> ChangeLogEntry:
     return tracked.tracking_changes()[-1]
 
 

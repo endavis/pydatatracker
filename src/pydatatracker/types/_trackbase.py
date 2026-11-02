@@ -9,7 +9,7 @@
 """Module for monitoring and managing data with tracking capabilities.
 
 This module provides the `TrackBase` class, which allows for the tracking
-of changes to opjects and the management of relationships between tracked
+of changes to objects and the management of relationships between tracked
 objects and their children. It includes methods for locking and unlocking
 objects, notifying observers of changes, and maintaining a history of
 original values, making it a valuable tool for monitoring state changes in
@@ -71,7 +71,7 @@ def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @wraps(method)
-    def wrapper(self, *args, **kwargs) -> Any:
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         """Check if the instance is locked before executing the method.
 
         This function is used as a decorator to ensure that a method cannot be called
@@ -111,7 +111,7 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @wraps(method)
-    def wrapper(self, *args, **kwargs) -> Any:
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         """Track changes to the object before and after method execution.
 
         This function is used as a decorator to monitor changes made to the object
@@ -185,7 +185,7 @@ class TrackBase:
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
         tracking_delimiter: str = "+",
-        **kwargs: dict,
+        **kwargs: Any,
     ) -> None:
         """Initialize a new instance of the TrackBase class.
 
@@ -212,13 +212,13 @@ class TrackBase:
         self._tracking_name = tracking_name
         self._tracking_auto_converted_in = tracking_auto_converted_in
         self._tracking_uuid = uuid4().hex
-        self._tracking_observers = {}
-        self._tracking_context = {}
+        self._tracking_observers: dict[int, list[Callable[..., Any]]] = {}
+        self._tracking_context: dict[str, Any] = {}
         self._tracking_changes: list[ChangeLogEntry] = []
         self._tracking_locked = False
         self._tracking_auto_convert = tracking_auto_convert
         self._tracking_created = datetime.datetime.now()
-        self._tracking_child_tracked_items = {}
+        self._tracking_child_tracked_items: dict[str, Any] = {}
         self._tracking_delimiter = tracking_delimiter
         self._tracking_debug_flag = False
         self._tracking_capture_snapshots = kwargs.get("tracking_capture_snapshots", False)
@@ -447,7 +447,7 @@ class TrackBase:
             for observer in self._tracking_observers[priority]:
                 observer(change_log_entry)
 
-    def tracking_create_change(self, **kwargs) -> None:
+    def tracking_create_change(self, **kwargs: Any) -> None:
         """Create a change log entry for the tracked object.
 
         This method generates a new change log entry based on the provided keyword
@@ -480,7 +480,7 @@ class TrackBase:
         self._tracking_changes.append(change_log_entry)
         self._tracking_notify_observers(change_log_entry)
 
-    def _tracking_format_tree_location(self, location: str = "") -> dict[str, str]:
+    def _tracking_format_tree_location(self, location: str | None = "") -> dict[str, str]:
         """Format the tree location for a change log entry.
 
         This method constructs a dictionary representing the location of the tracked

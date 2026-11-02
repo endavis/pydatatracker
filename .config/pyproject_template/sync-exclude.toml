@@ -1,0 +1,24 @@
+# Template paths pydatatracker deliberately does not adopt: the skeleton package
+# (`src/package_name/` → cli/core/logging) and the tests that cover it.
+# Read by `manage.py check` and the doc-scan tests (ADR-9026).
+exclude = [
+    "src/package_name/**",
+    "src/pydatatracker/cli.py",
+    "src/pydatatracker/core.py",
+    "src/pydatatracker/logging.py",
+    "docs/usage/cli.md",
+    "tests/test_cli.py",
+    "tests/test_core.py",
+    "tests/test_example.py",
+    "tests/test_logging.py",
+    "tests/benchmarks/test_bench_logging.py",
+    "tests/template/test_properties.py",
+    "tests/template/test_utils.py",
+    "tests/template/test_utils_properties.py",
+    "tests/template/test_check_template_updates.py",
+    # Worked-example paths in template docs; configure.py substitutes the package
+    # name into them, so the doc-path allowlist entry `src/__PACKAGE_NAME__/` misses.
+    "src/pydatatracker/cache.py",
+    "src/pydatatracker/provider.py",
+    "src/pydatatracker/farewell.py",
+]

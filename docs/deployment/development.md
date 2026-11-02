@@ -1,0 +1,570 @@
+---
+title: Development Deployment Guide
+description: Guide for setting up and running the application in development environments
+audience:
+  - users
+  - contributors
+tags:
+  - deployment
+  - development
+  - setup
+---
+
+# Development Deployment Guide
+
+This guide covers setting up and running this project in development environments.
+
+## Quick Start
+
+```bash
+# Clone and setup
+git clone <repository-url>
+cd <project-name>
+
+# Install the project and its development tools
+uv sync --all-extras --dev
+
+# Run tests to verify setup
+doit test
+
+# Start development
+uv run python -m pydatatracker
+```
+
+## Environment Setup
+
+### Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Python | 3.12+ | Runtime |
+| uv | Latest | Package management |
+| git | Latest | Version control |
+| Docker | Latest | (Optional) Containerized services |
+
+### Installing uv
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Verify installation
+uv --version
+```
+
+### Project Setup
+
+```bash
+# Create the virtual environment and install the project with its development tools
+uv sync --all-extras --dev
+
+# Activate the environment (optional, uv run handles this)
+source .venv/bin/activate  # Linux/macOS
+.venv\Scripts\activate     # Windows
+```
+
+The development tools, `doit` included, live in the `dev` and `security` extras, and a plain
+`uv sync` uninstalls them. Every sync after this first one is `doit install_dev`, which runs the
+same command.
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file for local configuration:
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit with your local settings
+```
+
+**Common development variables:**
+
+```bash
+# .env
+APP_ENV=development
+DEBUG=true
+LOG_LEVEL=DEBUG
+DATABASE_URL=sqlite:///./dev.db
+SECRET_KEY=dev-secret-key-not-for-production
+```
+
+### Local Configuration Files
+
+The project supports local configuration overrides:
+
+| File | Purpose | Git Status |
+|------|---------|------------|
+| `.env` | Environment variables | Ignored |
+| `.envrc.local` | direnv local overrides | Ignored |
+| `settings.local.toml` | Local settings | Ignored |
+
+**Important:** Never commit files containing secrets. These local files are in `.gitignore`.
+
+## Running the Application
+
+### Using uv run
+
+The recommended way to run commands:
+
+```bash
+# Run the main module
+uv run python -m pydatatracker
+
+# Run a specific script
+uv run python scripts/example.py
+
+# Run with arguments
+uv run python -m pydatatracker --verbose
+```
+
+### Using doit Tasks
+
+```bash
+# List all available tasks
+doit list
+
+# Run tests
+doit test
+
+# Run linting and type checks
+doit lint
+doit typecheck
+
+# Run all checks
+doit check
+
+# Format code
+doit fmt
+```
+
+### Direct Python Execution
+
+If you've activated the virtual environment:
+
+```bash
+# Activate first
+source .venv/bin/activate
+
+# Then run directly
+python -m pydatatracker
+```
+
+## Development Workflow
+
+### Making Changes
+
+1. **Create a branch** for your work:
+   ```bash
+   git checkout -b feature/my-feature
+   ```
+
+2. **Make changes** and run tests frequently:
+   ```bash
+   doit test
+   ```
+
+3. **Format and lint** before committing:
+   ```bash
+   doit fmt
+   doit check
+   ```
+
+4. **Commit** with conventional commit messages:
+   ```bash
+   git commit -m "feat: add new feature"
+   ```
+
+### Running Tests
+
+```bash
+# Run all tests
+doit test
+
+# Run with coverage
+doit coverage
+
+# Run specific test file
+uv run pytest tests/test_specific.py
+
+# Run tests matching pattern
+uv run pytest -k "test_feature"
+
+# Run with verbose output
+uv run pytest -v
+```
+
+### Debugging
+
+#### VS Code
+
+Add to `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Module",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pydatatracker",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}
+```
+
+#### PyCharm
+
+1. Go to **Run > Edit Configurations**
+2. Add new **Python** configuration
+3. Set **Module name**: `pydatatracker`
+4. Set **Working directory**: project root
+5. Add **Environment variables** from `.env`
+
+#### Command Line Debugging
+
+```bash
+# Using pdb
+uv run python -m pdb -m pydatatracker
+
+# Using breakpoint() in code
+# Add breakpoint() where you want to stop, then run normally
+uv run python -m pydatatracker
+```
+
+## Local Services
+
+### Using Docker Compose
+
+For services like databases and caches:
+
+```yaml
+# docker-compose.yml
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: devdb
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+```
+
+```bash
+# Start services
+docker compose up -d
+
+# Stop services
+docker compose down
+
+# View logs
+docker compose logs -f postgres
+```
+
+### SQLite for Development
+
+For simpler setups, use SQLite:
+
+```bash
+# .env
+DATABASE_URL=sqlite:///./dev.db
+```
+
+SQLite requires no external services and is suitable for most development work.
+
+## Code Quality
+
+### Pre-commit Hooks
+
+The project uses pre-commit hooks for quality gates:
+
+```bash
+# Install hooks (pre-commit, commit-msg) and remove any post-merge/post-checkout
+# hook left by an earlier version of this project
+doit pre_commit_install
+
+# Run manually
+doit pre_commit_run
+
+# Skip hooks (use sparingly)
+git commit --no-verify -m "WIP: work in progress"
+```
+
+Earlier versions also installed **post-merge** and **post-checkout** hooks that automatically ran
+`uv sync --all-extras --dev` when `uv.lock` changed after a `git pull` or branch switch. Removed in
+#1033: `pre-commit` reads `.pre-commit-config.yaml` from whatever branch is checked out, so either
+hook type ran code from a branch before anyone had reviewed it. `doit check` and `doit test` now
+warn instead — without failing — when the environment has drifted from `uv.lock`.
+
+### Type Checking
+
+```bash
+# Run mypy
+doit typecheck
+
+# Or directly
+uv run mypy src/
+```
+
+### Linting
+
+```bash
+# Run ruff linter
+doit lint
+
+# Auto-fix issues
+uv run ruff check --fix src/
+```
+
+### Formatting
+
+```bash
+# Format code
+doit fmt
+
+# Check format without changing
+doit format_check
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Virtual Environment Not Found
+
+```bash
+# Recreate the environment (doit went with it, so call uv directly)
+rm -rf .venv
+uv sync --all-extras --dev
+```
+
+#### Import Errors
+
+```bash
+# Ensure package is installed in editable mode
+doit install_dev
+
+# Verify installation
+uv run python -c "import pydatatracker; print(pydatatracker.__version__)"
+```
+
+#### Permission Denied
+
+```bash
+# Fix script permissions
+chmod +x scripts/*.py
+
+# On Windows, run as administrator or check antivirus
+```
+
+#### Pre-commit Hook Failures
+
+```bash
+# Update hooks
+uv run pre-commit autoupdate
+
+# Run checks to see what's failing
+doit check
+```
+
+### Environment Issues
+
+#### Wrong Python Version
+
+The project pins its Python version in `.python-version`, and uv builds `.venv` on that version. `python --version` reports whichever `python` comes first on your `PATH`, which may not be the project's.
+
+```bash
+# Check the version .venv runs; --no-sync keeps uv from rebuilding it first
+uv run --no-sync python --version
+
+# Install the pinned version, if uv doesn't have it yet
+uv python install
+
+# Rebuild .venv on the pinned version, with the dev tools
+uv sync --all-extras --dev
+```
+
+`uv sync` replaces a `.venv` built on a different version. `.python-version` is tracked, so change it only when the project moves to a new Python version.
+
+#### Dependency Conflicts
+
+```bash
+# Clear the cache for one package and reinstall
+uv cache clean <package>
+rm -rf .venv uv.lock
+uv sync --all-extras --dev
+```
+
+`uv cache clean` with no package empties the uv cache shared by every project on the machine. Name
+the package, or use `uv cache prune` to drop only unused entries.
+
+## IDE Setup
+
+### VS Code Extensions
+
+Recommended extensions (`.vscode/extensions.json`):
+
+- `ms-python.python` - Python support
+- `ms-python.vscode-pylance` - Type checking
+- `charliermarsh.ruff` - Ruff linter/formatter
+- `tamasfe.even-better-toml` - TOML support
+- `github.copilot` - AI assistance (optional)
+
+### VS Code Settings
+
+Recommended settings (`.vscode/settings.json`):
+
+```json
+{
+  "python.defaultInterpreterPath": ".venv/bin/python",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "python.analysis.typeCheckingMode": "basic"
+}
+```
+
+### PyCharm Setup
+
+1. **Set interpreter**: File > Settings > Project > Python Interpreter > Add > Existing Environment > `.venv/bin/python`
+2. **Enable ruff**: Install Ruff plugin from marketplace
+3. **Configure mypy**: Install Mypy plugin, set to use project's mypy.ini
+
+## Hot Reloading
+
+For web applications or services that support it:
+
+```bash
+# Using uvicorn with reload
+uv run uvicorn pydatatracker.app:app --reload
+
+# Using Flask debug mode
+FLASK_DEBUG=1 uv run flask run
+
+# Using watchfiles for custom scripts
+uv run watchfiles "python -m pydatatracker" src/
+```
+
+## Performance Profiling
+
+### CPU Profiling
+
+```bash
+# Using cProfile
+uv run python -m cProfile -o profile.stats -m pydatatracker
+
+# Analyze results
+uv run python -c "import pstats; p = pstats.Stats('profile.stats'); p.sort_stats('cumulative').print_stats(20)"
+```
+
+### Memory Profiling
+
+```bash
+# Install memory profiler
+uv add --dev memory-profiler
+
+# Run with profiling
+uv run python -m memory_profiler script.py
+```
+
+## Publishing to TestPyPI
+
+TestPyPI is a separate instance of PyPI for testing package publishing without affecting the real index.
+
+### Why Use TestPyPI?
+
+- Test your publishing workflow before production
+- Verify package metadata and README rendering
+- Catch packaging issues early
+- Safe environment for experimentation
+
+### Configure TestPyPI Credentials
+
+Generate a token at https://test.pypi.org/manage/account/token/
+
+```bash
+# Set TestPyPI token
+export UV_PUBLISH_TOKEN=pypi-xxxxxxxxxxxx
+```
+
+### Build and Publish to TestPyPI
+
+```bash
+# Build distribution packages
+uv build
+
+# Publish to TestPyPI
+uv publish --publish-url https://test.pypi.org/legacy/
+
+# Or with explicit token
+uv publish --publish-url https://test.pypi.org/legacy/ --token pypi-xxxxxxxxxxxx
+```
+
+### Test Installation from TestPyPI
+
+```bash
+# Install from TestPyPI
+uv pip install --index-url https://test.pypi.org/simple/ pydatatracker
+
+# If your package has dependencies from real PyPI, use both indexes
+uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ pydatatracker
+```
+
+### Verify Package
+
+```bash
+# Check the package page
+# https://test.pypi.org/project/pydatatracker/
+
+# Verify installation works
+uv venv /tmp/test-install
+uv pip install --python /tmp/test-install --index-url https://test.pypi.org/simple/ pydatatracker
+```
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Version already exists | Increment version, TestPyPI doesn't allow re-uploads |
+| Missing dependencies | Use `--extra-index-url https://pypi.org/simple/` |
+| README not rendering | Check pyproject.toml `readme` field, validate markdown |
+| Authentication failed | Regenerate token, check URL is correct |
+
+## See Also
+
+- [Installation Guide](../getting-started/installation.md) - Initial project setup
+- [Usage Guide](../usage/basics.md) - Package usage patterns
+- [Production Deployment Guide](production.md) - Deploying to production
+- [CI/CD Testing Guide](../development/ci-cd-testing.md) - Automated pipelines

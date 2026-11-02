@@ -1,36 +1,105 @@
-# Bytecode
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Environments
+# Virtual environments
+venv/
 .venv/
-.env
-.env.*
-.python-version
+.venv*/
+ENV/
+env/
 
-# Tooling
-.ruff_cache/
+# Testing
 .pytest_cache/
-.coverage*
+.coverage
+.coverage.*
 htmlcov/
+.tox/
+.hypothesis/
+# mutmut's working copy, made by `doit mutate` at the repository root.
+/mutants/
+
+# Type checking and linting
 .mypy_cache/
+.ruff_cache/
+.pytype/
 .pyre/
 .dmypy.json
+dmypy.json
 
-# Packaging
-build/
-dist/
-.eggs/
-*.egg-info/
-.uv-cache/
+# IDEs
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Project specific
-.tmp/
+# direnv
+.direnv/
+.envrc.local
+
+# Per-user local state. `.claude/settings.local.json` was previously covered
+# only by the maintainer's global ignore file, so a fresh clone by anyone else
+# showed it as untracked. `.local/` is where `gh` writes its state dir when
+# HOME is unset (see tests/test_statusline_agy.py).
+.claude/settings.local.json
+.local/
+
+# Environment variables
+.env
+.env.*
+
+# Temporary files
 tmp/*
 !tmp/.gitkeep
+.cache/
 
-# Editors
-.DS_Store
-.idea/
-.vscode/
+# Git worktrees made by `doit worktree`. Not temporary: each lives until its PR merges.
+# Anchored to the root, so a directory named `worktrees` elsewhere stays tracked (#860).
+/worktrees/
+# Claude Code's built-in worktree tool (EnterWorktree) creates worktrees here.
+.claude/worktrees/
+
+# Documentation
+site/
+
+# Build and packaging
+*.whl
+.uv-cache/
+**/_version.py
+
+# Project specific
+*.log
+# doit's dependency database; the filename depends on the dbm backend
+# (dbm.sqlite3/dbm.gnu: .doit.db, dbm.ndbm: .doit.db.db, dbm.dumb: .doit.db.dat/.dir/.bak)
+.doit.db
+.doit.db.*
+coverage.xml
+.nfs*
+tools/hooks/ai/hook-debug.jsonl
+
+# Per-user agent role overrides (CLI and model names are personal; see docs/development/ai/agent-roles.md)
+/.config/pyproject_template/agents.local.toml
+
+# Project specific
+.coverage*
+.tmp/

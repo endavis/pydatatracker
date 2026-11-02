@@ -42,7 +42,7 @@ Classes:
 
 # Standard Library
 from collections.abc import Hashable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 # 3rd Party
 # Project
@@ -65,7 +65,7 @@ class TrackedDict(TrackBase, dict):
 
     def __init__(
         self,
-        *args,
+        *args: Any,
         tracking_name: str | None = None,
         tracking_auto_converted_in: str | None = None,
         tracking_auto_convert: bool = False,
@@ -73,7 +73,7 @@ class TrackedDict(TrackBase, dict):
         tracking_location: str | None = "",
         tracking_capture_snapshots: bool | None = None,
         tracking_capture_stack: bool | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Initialize the tracked dictionary with optional tracking parameters.
 
@@ -92,7 +92,7 @@ class TrackedDict(TrackBase, dict):
 
         """
         dict.__init__(self, *args, **kwargs)
-        tracking_kwargs = {}
+        tracking_kwargs: dict[str, Any] = {}
         if tracking_capture_snapshots is not None:
             tracking_kwargs["tracking_capture_snapshots"] = tracking_capture_snapshots
         if tracking_capture_stack is not None:
@@ -309,7 +309,7 @@ class TrackedDict(TrackBase, dict):
 
     @check_lock
     @track_changes
-    def update(self, *args, **kwargs) -> None:
+    def update(self, *args: Any, **kwargs: Any) -> None:
         """Update dictionary with elements from iterable of key/value pairs.
 
         This method updates the tracked dictionary with key-value pairs from another
@@ -501,9 +501,10 @@ class TrackedDict(TrackBase, dict):
                     self[key]._tracking_known_uuids_tree(level + 1, emptybar=emptybar)
                 )
 
-    def __ior__(  # pyright: ignore[reportIncompatibleMethodOverride]
+    # Intentionally unsupported; dict's __or__/__ior__ pairing cannot be satisfied by a raiser.
+    def __ior__(  # type: ignore[misc]  # pyright: ignore[reportIncompatibleMethodOverride]
         self, other: Any
-    ) -> None:
+    ) -> NoReturn:
         """In-place OR operation (|=) override for TrackedDict.
 
         This method is intentionally not implemented as the |= operator is not supported
@@ -521,6 +522,7 @@ class TrackedDict(TrackBase, dict):
             >>> tracked_dict |= {'b': 2}  # Raises NotImplementedError
 
         """
+        del other  # unused; the operation is unsupported
         raise NotImplementedError("The |= operator is not supported for TrackedDict")
 
     def _tracking_format_tree_location(self, location: str | int | None = None) -> dict:
@@ -542,6 +544,6 @@ class TrackedDict(TrackBase, dict):
             return {
                 "type": self._tracking_is_trackable(self),
                 "uuid": self._tracking_uuid,
-                "location": f"[{repr(location)}]",
+                "location": f"[{location!r}]",
             }
         return {"type": self._tracking_is_trackable(self), "uuid": self._tracking_uuid}

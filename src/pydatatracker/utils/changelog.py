@@ -41,6 +41,8 @@ import ast
 import datetime
 import inspect
 import pprint
+import threading
+from typing import Any
 from uuid import uuid4
 
 # 3rd Party
@@ -48,7 +50,31 @@ from uuid import uuid4
 # Project
 
 # Globals
-_IGNORE_IN_STACK = []
+_IGNORE_IN_STACK: list[str] = []
+_TIMESTAMP_LOCK = threading.Lock()
+_last_timestamp = datetime.datetime.min.replace(tzinfo=datetime.UTC)
+_ONE_MICROSECOND = datetime.timedelta(microseconds=1)
+
+
+def _next_timestamp() -> datetime.datetime:
+    """Return a UTC timestamp strictly later than any previously returned one.
+
+    The system clock can return the same value for consecutive calls (on Windows
+    its resolution is coarse enough that a burst of changes shares one value), and
+    change history is ordered and filtered by ``created_time``. Bumping a tied or
+    earlier reading by one microsecond keeps the order of entries total.
+
+    Returns:
+        The current UTC time, or one microsecond past the previous timestamp if the
+        clock has not advanced.
+    """
+    global _last_timestamp
+    with _TIMESTAMP_LOCK:
+        now = datetime.datetime.now(datetime.UTC)
+        if now <= _last_timestamp:
+            now = _last_timestamp + _ONE_MICROSECOND
+        _last_timestamp = now
+        return now
 
 
 def add_to_ignore_in_stack(tlist: list[str]) -> None:
@@ -93,7 +119,7 @@ class ChangeLogEntry:
 
     """
 
-    def __init__(self, item_uuid: str, *, capture_stack: bool = True, **kwargs) -> None:
+    def __init__(self, item_uuid: str, *, capture_stack: bool = True, **kwargs: Any) -> None:
         """Initialize a new ChangeLogEntry instance.
 
         Creates a new change log entry with a unique identifier and metadata. Sets up
@@ -115,7 +141,7 @@ class ChangeLogEntry:
         self.tracked_item_uuid = item_uuid
         self.extra = kwargs
         self.header_column_width = 17
-        self.created_time = datetime.datetime.now(datetime.UTC)
+        self.created_time = _next_timestamp()
         actor = self.extra.pop("actor", None)
         if capture_stack and actor is None:
             self.stack = self.get_stack()
@@ -123,7 +149,7 @@ class ChangeLogEntry:
         else:
             self.stack = []
             self.actor = actor or ""
-        self.tree = []
+        self.tree: list[Any] = []
         for item in self.extra:
             if item == "location":
                 continue
@@ -147,7 +173,7 @@ class ChangeLogEntry:
 
     def get_stack(self) -> list[str]:
         """Retrieve the current stack trace in a lightweight manner."""
-        stack = []
+        stack: list[str] = []
         frame = inspect.currentframe()
         if not frame:
             return stack
@@ -204,11 +230,7 @@ class ChangeLogEntry:
             True if this entry was created earlier than the other, False otherwise
 
         """
-        return (
-            self.created_time < value.created_time  # type: ignore
-            if hasattr(value, "created_time")
-            else False
-        )
+        return self.created_time < value.created_time if hasattr(value, "created_time") else False
 
     def copy(self, new_type: str, new_item_uuid: str) -> "ChangeLogEntry":
         """Create a copy of this ChangeLogEntry with a new type and UUID.
@@ -305,7 +327,7 @@ class ChangeLogEntry:
 
         return tmsg
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the change log entry to a JSON-friendly dict."""
         return {
             "uuid": self.uuid,

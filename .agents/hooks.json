@@ -1,0 +1,24 @@
+{
+  "block-dangerous-commands": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file|write_file|edit_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/tools/hooks/ai/block-dangerous-commands.sh\""
+          }
+        ]
+      }
+    ]
+  },
+  "template-update-check": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python3 \"$(git rev-parse --show-toplevel)/tools/hooks/ai/template-update-check.py\" --host=antigravity",
+        "timeout": 5
+      }
+    ]
+  }
+}

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import datetime
 import logging
-import time
+import types
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,8 @@ from pydatatracker.observers import (
     json_file_observer,
     logging_observer,
 )
+from pydatatracker.utils import changelog
+from pydatatracker.utils.changelog import ChangeLogEntry
 
 
 def test_tracked_dict_logs_updates() -> None:
@@ -51,30 +54,6 @@ def test_tracking_changes_can_be_limited() -> None:
 
     assert len(history) == 1
     assert history[0].extra["location"] == "b"
-
-
-def _measure_assignment_time(snapshot: bool, iterations: int = 2000) -> float:
-    tracked = TrackedDict(tracking_capture_snapshots=snapshot)
-    start = time.perf_counter()
-    for index in range(iterations):
-        tracked[str(index)] = index
-    end = time.perf_counter()
-    return end - start
-
-
-def test_snapshot_mode_relative_timing() -> None:
-    """Report timing difference between snapshot modes for manual inspection."""
-    baseline = _measure_assignment_time(snapshot=False)
-    snapshot = _measure_assignment_time(snapshot=True)
-    percent = ((snapshot - baseline) / baseline * 100) if baseline else float("inf")
-
-    print(
-        f"tracking_capture_snapshots timing: off={baseline:.6f}s "
-        f"on={snapshot:.6f}s ({snapshot - baseline:.6f}s delta, "
-        f"{percent:.2f}% slower)"
-    )
-
-    assert snapshot >= baseline
 
 
 def test_capture_stack_is_opt_in() -> None:
@@ -135,9 +114,9 @@ def test_change_collector_observer_records_events() -> None:
 
 def test_filtered_observer_filters_events() -> None:
     tracked = TrackedDict()
-    collected = []
+    collected: list[object] = []
 
-    def observer(change):
+    def observer(change: ChangeLogEntry) -> None:
         collected.append(change.extra.get("location"))
 
     filtered = FilteredObserver(observer, actions={"update"}, locations={"foo"})
@@ -161,7 +140,7 @@ def test_change_log_entry_to_dict() -> None:
     assert serialized["created_time"].endswith("Z") or serialized["created_time"].count(":") >= 2
 
 
-def test_json_file_observer_writes_changes(tmp_path) -> None:
+def test_json_file_observer_writes_changes(tmp_path: Path) -> None:
     tracked = TrackedDict()
     file_path = tmp_path / "log.jsonl"
 
@@ -174,7 +153,7 @@ def test_json_file_observer_writes_changes(tmp_path) -> None:
     assert "foo" in lines[0]
 
 
-def test_logging_observer_uses_logger(caplog) -> None:
+def test_logging_observer_uses_logger(caplog: pytest.LogCaptureFixture) -> None:
     tracked = TrackedDict()
     logger = logging.getLogger("pydatatracker.tests")
     observer = logging_observer(logger)
@@ -186,14 +165,14 @@ def test_logging_observer_uses_logger(caplog) -> None:
     assert any("foo" in record.message for record in caplog.records)
 
 
-def test_async_queue_observer_handles_coroutines():
+def test_async_queue_observer_handles_coroutines() -> None:
     tracked = TrackedDict()
 
     class DummyQueue:
-        def __init__(self):
-            self.items = []
+        def __init__(self) -> None:
+            self.items: list[object] = []
 
-        def put(self, value):
+        def put(self, value: object) -> None:
             self.items.append(value)
 
     queue = DummyQueue()
@@ -204,14 +183,14 @@ def test_async_queue_observer_handles_coroutines():
     assert queue.items
 
 
-def test_async_queue_observer_synchronous_queue():
+def test_async_queue_observer_synchronous_queue() -> None:
     tracked = TrackedDict()
 
     class SyncQueue:
-        def __init__(self):
-            self.items = []
+        def __init__(self) -> None:
+            self.items: list[object] = []
 
-        def put(self, value):
+        def put(self, value: object) -> None:
             self.items.append(value)
 
     queue = SyncQueue()
@@ -219,3 +198,37 @@ def test_async_queue_observer_synchronous_queue():
     tracked.tracking_add_observer(observer)
     tracked["foo"] = "bar"
     assert queue.items
+
+
+def test_changes_since_is_ordered_when_the_clock_does_not_advance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Entries created at the same clock reading still get distinct, ordered timestamps.
+
+    Windows' clock resolution let `init` and the first assignment share a timestamp, so
+    `changes_since(first_entry)` also returned `init`.
+    """
+    frozen = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
+
+    class FrozenClock:
+        @staticmethod
+        def now(tz: datetime.tzinfo | None = None) -> datetime.datetime:
+            return frozen.astimezone(tz)
+
+    clock = types.SimpleNamespace(
+        datetime=FrozenClock, UTC=datetime.UTC, timedelta=datetime.timedelta
+    )
+    monkeypatch.setattr(changelog, "datetime", clock)
+    monkeypatch.setattr(changelog, "_last_timestamp", frozen - datetime.timedelta(seconds=1))
+
+    tracked = TrackedDict()
+    tracked["alpha"] = 1
+    first_entry = tracked.last_change()
+    assert first_entry is not None
+    tracked["beta"] = 2
+
+    times = [entry.created_time for entry in tracked.tracking_changes()]
+    assert times == sorted(times)
+    assert len(set(times)) == len(times)
+    locations = [entry.extra["location"] for entry in tracked.changes_since(first_entry)]
+    assert locations == ["alpha", "beta"]

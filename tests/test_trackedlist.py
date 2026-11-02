@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pydatatracker import TrackedList
+from pydatatracker.utils.changelog import ChangeLogEntry
 
 
-def _latest_change(tracked: TrackedList):
+def _latest_change(tracked: TrackedList) -> ChangeLogEntry:
     return tracked.tracking_changes()[-1]
 
 
@@ -68,3 +69,18 @@ def test_tracked_list_clear_records_all_removed_items() -> None:
     change = _latest_change(tracked)
     assert change.extra["action"] == "remove"
     assert "[1, 2]" in change.extra["removed_items"]
+
+
+def test_tracked_list_snapshot_opt_in_records_repr() -> None:
+    """`tracking_capture_snapshots` controls repr logging for lists."""
+    tracked = TrackedList(tracking_capture_snapshots=True)
+    tracked.append(1)
+    change = tracked.tracking_changes()[-1]
+    assert change.extra["data_pre_change"] == "[]"
+    assert change.extra["data_post_change"] == "[1]"
+
+    plain = TrackedList()
+    plain.append(1)
+    plain_change = plain.tracking_changes()[-1]
+    assert "data_pre_change" not in plain_change.extra
+    assert "data_post_change" not in plain_change.extra
