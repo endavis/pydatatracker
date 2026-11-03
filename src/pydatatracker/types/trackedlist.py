@@ -70,6 +70,7 @@ class TrackedList(TrackBase, list):
         tracking_capture_snapshots: bool | None = None,
         tracking_capture_stack: bool | None = None,
         tracking_record_init: bool | None = None,
+        tracking_max_changes: int | None = None,
     ) -> None:
         """Initialize the tracked list.
 
@@ -83,6 +84,8 @@ class TrackedList(TrackBase, list):
             tracking_parent: The parent tracking object.
             tracking_location: The location of the tracking object.
             tracking_record_init: Whether to record the ``init`` entry; None inherits.
+            tracking_max_changes: Cap on stored change entries (oldest dropped); None
+                inherits from the parent, else unbounded.
 
         """
         if data is None:
@@ -95,6 +98,8 @@ class TrackedList(TrackBase, list):
             extra_kwargs["tracking_capture_stack"] = tracking_capture_stack
         if tracking_record_init is not None:
             extra_kwargs["tracking_record_init"] = tracking_record_init
+        if tracking_max_changes is not None:
+            extra_kwargs["tracking_max_changes"] = tracking_max_changes
         TrackBase.__init__(
             self,
             tracking_auto_converted_in=tracking_auto_converted_in,

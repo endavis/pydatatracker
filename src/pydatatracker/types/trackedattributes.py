@@ -99,6 +99,7 @@ class TrackedAttr(TrackBase):
         tracking_capture_snapshots: bool | None = None,
         tracking_capture_stack: bool | None = None,
         tracking_record_init: bool | None = None,
+        tracking_max_changes: int | None = None,
     ) -> None:
         """Initialize a TrackedAttr instance.
 
@@ -117,6 +118,8 @@ class TrackedAttr(TrackBase):
             tracking_record_init: Whether to record the ``init`` entry. None
                 inherits from the parent, else the class default (False for
                 classes that declare ``_tracking_fields``).
+            tracking_max_changes: Cap on stored change entries (oldest dropped); None
+                inherits from the parent, else unbounded.
 
         Returns:
             None
@@ -125,6 +128,8 @@ class TrackedAttr(TrackBase):
         record_kwargs: dict[str, Any] = {}
         if tracking_record_init is not None:
             record_kwargs["tracking_record_init"] = tracking_record_init
+        if tracking_max_changes is not None:
+            record_kwargs["tracking_max_changes"] = tracking_max_changes
         TrackBase.__init__(
             self,
             tracking_auto_convert=tracking_auto_convert,

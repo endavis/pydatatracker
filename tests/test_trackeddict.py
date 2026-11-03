@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import deque
+
 from pydatatracker import TrackedDict, TrackedList
 from pydatatracker.utils.changelog import ChangeLogEntry
 
@@ -185,6 +187,39 @@ def test_tracked_dict_child_inherits_parent_settings_when_parent_empty() -> None
     child = parent["c"]
     assert child._tracking_capture_snapshots is True
     assert child._tracking_record_init is False
+
+
+def test_tracked_dict_child_inherits_max_changes() -> None:
+    """A nested child inherits the parent's cap unless it passes its own."""
+    parent = TrackedDict(tracking_auto_convert=True, tracking_max_changes=5)
+    parent["c"] = {"state": "a"}
+    child = parent["c"]
+    assert child._tracking_max_changes == 5
+    assert isinstance(child._tracking_changes, deque)
+    assert child._tracking_changes.maxlen == 5
+
+    own = TrackedDict(tracking_parent=parent, tracking_max_changes=2)
+    assert own._tracking_max_changes == 2
+    assert isinstance(own._tracking_changes, deque)
+    assert own._tracking_changes.maxlen == 2
+
+
+def test_tracked_dict_uncapped_parent_gives_uncapped_child() -> None:
+    """Without a cap on the parent the child history stays a plain list."""
+    parent = TrackedDict(tracking_auto_convert=True)
+    parent["c"] = {"state": "a"}
+    child = parent["c"]
+    assert child._tracking_max_changes is None
+    assert isinstance(child._tracking_changes, list)
+
+
+def test_tracked_dict_child_init_recorded_into_capped_container() -> None:
+    """A child's ``init`` entry lands in the capped child history."""
+    parent = TrackedDict(tracking_auto_convert=True, tracking_max_changes=10)
+    child = TrackedDict({"a": 1}, tracking_parent=parent)
+    assert [c.extra["action"] for c in child.tracking_changes()][:1] == ["init"]
+    assert isinstance(child._tracking_changes, deque)
+    assert child._tracking_changes.maxlen == 10
 
 
 def test_tracked_dict_overwrite_and_delete_unlink_child() -> None:

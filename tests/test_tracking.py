@@ -5,11 +5,12 @@ from __future__ import annotations
 import datetime
 import logging
 import types
+from collections import deque
 from pathlib import Path
 
 import pytest
 
-from pydatatracker import ChangeCollector, TrackedDict
+from pydatatracker import ChangeCollector, TrackedAttr, TrackedDict, TrackedList
 from pydatatracker.observers import (
     FilteredObserver,
     async_queue_observer,
@@ -232,3 +233,111 @@ def test_changes_since_is_ordered_when_the_clock_does_not_advance(
     assert len(set(times)) == len(times)
     locations = [entry.extra["location"] for entry in tracked.changes_since(first_entry)]
     assert locations == ["alpha", "beta"]
+
+
+# --- tracking_max_changes -------------------------------------------------
+
+
+def test_max_changes_caps_history_newest_last() -> None:
+    """10,000 appends with a cap of 100 leave the newest 100 in order."""
+    items = TrackedList(tracking_max_changes=100)
+    for i in range(10_000):
+        items.append(i)
+
+    changes = items.tracking_changes()
+    assert len(changes) == 100
+    assert isinstance(items._tracking_changes, deque)
+    assert items.last_change() == changes[-1]
+    assert [c.extra["value"] for c in changes] == [str(i) for i in range(9_900, 10_000)]
+
+
+def test_max_changes_keeps_uuid_set_in_sync() -> None:
+    """After eviction the dedup set holds exactly the retained uuids."""
+    items = TrackedList(tracking_max_changes=10)
+    for i in range(200):
+        items.append(i)
+    assert items._tracking_change_uuids == {c.uuid for c in items._tracking_changes}
+
+
+def test_default_history_is_unbounded_list() -> None:
+    """Without a cap the history is a list that keeps everything."""
+    items = TrackedList()
+    for i in range(5_000):
+        items.append(i)
+    assert isinstance(items._tracking_changes, list)
+    assert len(items.tracking_changes()) == 5_001
+
+
+def test_capped_tracking_changes_most_recent_returns_list() -> None:
+    """``most_recent`` slicing returns lists on a capped history."""
+    items = TrackedList(tracking_max_changes=5)
+    for i in range(20):
+        items.append(i)
+    full = items.tracking_changes()
+
+    assert items.tracking_changes(most_recent=2) == full[-2:]
+    assert items.tracking_changes(most_recent=5) == full
+    assert items.tracking_changes(most_recent=50) == full
+    assert items.tracking_changes(most_recent=0) == []
+    assert items.tracking_changes(most_recent=-1) == []
+    assert items.tracking_changes(None) == full
+    for result in (
+        items.tracking_changes(most_recent=2),
+        items.tracking_changes(most_recent=50),
+        items.tracking_changes(most_recent=0),
+        items.tracking_changes(None),
+    ):
+        assert type(result) is list
+
+
+def test_capped_last_change_and_changes_since() -> None:
+    """``last_change`` and ``changes_since`` work on a capped history."""
+    items = TrackedList(tracking_max_changes=5)
+    for i in range(20):
+        items.append(i)
+    full = items.tracking_changes()
+
+    assert items.last_change() == full[-1]
+    assert items.changes_since(None) == full
+    since = items.changes_since(full[2])
+    assert since == full[2:]
+    assert type(since) is list
+
+
+def test_capped_formatted_updates_shows_twenty() -> None:
+    """Formatted updates on a capped history over 20 entries show 20."""
+    items = TrackedList(tracking_max_changes=50)
+    for i in range(60):
+        items.append(i)
+    lines = items.tracking_get_formatted_updates()
+    assert lines.count("--------------------------------------") == 21
+
+
+def test_max_changes_zero_keeps_no_history_but_notifies() -> None:
+    """A cap of 0 stores nothing while observers still fire."""
+    items = TrackedList(tracking_max_changes=0)
+    seen: list[ChangeLogEntry] = []
+    items.tracking_add_observer(seen.append)
+    for i in range(3):
+        items.append(i)
+
+    assert items.tracking_changes() == []
+    assert items.last_change() is None
+    assert len(seen) == 3
+
+
+def test_max_changes_one_keeps_only_newest_without_duplicate() -> None:
+    """A cap of 1 keeps exactly the newest entry, once."""
+    items = TrackedList(tracking_max_changes=1)
+    for i in range(5):
+        items.append(i)
+    changes = items.tracking_changes()
+    assert len(changes) == 1
+    assert items._tracking_change_uuids == {changes[0].uuid}
+
+
+@pytest.mark.parametrize("cls", [TrackedDict, TrackedList, TrackedAttr])
+def test_negative_max_changes_raises(cls: type) -> None:
+    """A negative cap is rejected for every container type."""
+    with pytest.raises(ValueError, match="tracking_max_changes"):
+        cls(tracking_max_changes=-1)

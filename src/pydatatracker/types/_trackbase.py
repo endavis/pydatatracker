@@ -43,8 +43,10 @@ Classes:
 
 # Standard Library
 import datetime
+import itertools
 import logging
 import weakref
+from collections import deque
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, Literal
@@ -245,6 +247,11 @@ class TrackBase:
                 (with the full ``init_data`` repr) is recorded. When omitted it is
                 inherited from ``tracking_parent``, else from the class default
                 ``_tracking_record_init`` (True).
+                ``tracking_max_changes`` caps the change history at that many
+                entries (oldest dropped first); ``0`` keeps none. When omitted it
+                is inherited from ``tracking_parent``, else history is unbounded
+                (None). A child cannot pass None to lift a parent's cap. A
+                negative value raises ``ValueError``.
 
         Returns:
             None
@@ -255,7 +262,6 @@ class TrackBase:
         self._tracking_uuid = uuid4().hex
         self._tracking_observers: dict[int, list[_ObserverRef]] = {}
         self._tracking_context: dict[str, Any] = {}
-        self._tracking_changes: list[ChangeLogEntry] = []
         self._tracking_change_uuids: set[str] = set()
         self._tracking_locked = False
         self._tracking_auto_convert = tracking_auto_convert
@@ -277,6 +283,18 @@ class TrackBase:
             )
         if kwargs.get("tracking_record_init") is not None:
             self._tracking_record_init = kwargs["tracking_record_init"]
+        max_changes: int | None = None
+        if tracking_parent is not None:
+            max_changes = getattr(tracking_parent, "_tracking_max_changes", None)
+        if kwargs.get("tracking_max_changes") is not None:
+            max_changes = kwargs["tracking_max_changes"]
+        if max_changes is not None and max_changes < 0:
+            msg = f"tracking_max_changes must be >= 0 or None, got {max_changes}"
+            raise ValueError(msg)
+        self._tracking_max_changes = max_changes
+        self._tracking_changes: list[ChangeLogEntry] | deque[ChangeLogEntry] = (
+            [] if max_changes is None else deque(maxlen=max_changes)
+        )
         if "tracking_capture_snapshots" in kwargs:
             self._tracking_capture_snapshots = kwargs["tracking_capture_snapshots"]
         if "tracking_capture_stack" in kwargs:
@@ -464,7 +482,8 @@ class TrackBase:
             return list(self._tracking_changes)
         if most_recent <= 0:
             return []
-        return list(self._tracking_changes[-most_recent:])
+        skip = len(self._tracking_changes) - most_recent
+        return list(itertools.islice(self._tracking_changes, skip, None))
 
     def last_change(self) -> ChangeLogEntry | None:
         """Return the most recent change or None if no changes exist."""
@@ -553,6 +572,8 @@ class TrackBase:
         Membership is checked against a set of entry UUIDs (O(1)) instead of scanning
         the list; ``ChangeLogEntry.__eq__`` compares UUIDs, so the result is the same.
         All writes to ``_tracking_changes`` go through here to keep both in sync.
+        When ``tracking_max_changes`` is set and the history is full, the oldest
+        entry (and its uuid) is evicted first.
 
         Args:
             change_log_entry: The entry to record.
@@ -563,6 +584,13 @@ class TrackBase:
         """
         if change_log_entry.uuid in self._tracking_change_uuids:
             return False
+        if self._tracking_max_changes is not None:
+            if self._tracking_max_changes == 0:
+                return False
+            if len(self._tracking_changes) >= self._tracking_max_changes:
+                # The deque drops this entry on append; forget its uuid too so
+                # the set stays bounded. An evicted entry can be recorded again.
+                self._tracking_change_uuids.discard(self._tracking_changes[0].uuid)
         self._tracking_change_uuids.add(change_log_entry.uuid)
         self._tracking_changes.append(change_log_entry)
         return True
@@ -648,8 +676,7 @@ class TrackBase:
 
         """
         new_output = []
-        for item in self._tracking_changes[:20]:
-            # for item in self._tracking_changes:
+        for item in itertools.islice(self._tracking_changes, 20):
             new_output.append("--------------------------------------")
             new_output.extend(item.format_detailed())
         new_output.append("--------------------------------------")
