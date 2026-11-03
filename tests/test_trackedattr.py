@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from typing import ClassVar
 
 import pytest
@@ -324,3 +325,13 @@ def test_declared_field_nested_containers_record_nothing_anywhere() -> None:
     assert obj.tracking_changes() == []
     assert child.tracking_changes() == []
     assert grandchild.tracking_changes() == []
+
+
+def test_declared_class_child_inherits_max_changes() -> None:
+    """A declared container child inherits the owner's cap."""
+    obj = DeclaredContainers(tracking_max_changes=3)
+    child = obj.data
+    assert isinstance(child, TrackedDict)
+    assert child._tracking_max_changes == 3
+    assert isinstance(child._tracking_changes, deque)
+    assert child._tracking_changes.maxlen == 3

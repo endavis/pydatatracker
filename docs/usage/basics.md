@@ -64,6 +64,26 @@ changes = tracked.changes_since(first_change)
 print([entry.extra["location"] for entry in changes])
 ```
 
+### Capping change history
+
+By default every change is kept, so a long-running process grows without limit. Pass
+`tracking_max_changes` to keep only the newest entries:
+
+```python
+items = TrackedList(tracking_max_changes=100)
+for i in range(10_000):
+    items.append(i)
+assert len(items.tracking_changes()) == 100  # the newest entry is last
+```
+
+- Children inherit the cap from `tracking_parent` unless they pass their own. A child cannot
+  pass `None` to lift a parent's cap.
+- `0` keeps no history, but observers still receive every change.
+- A negative value raises `ValueError`.
+- `tracking_changes()`, `last_change()` and `changes_since()` keep their return types.
+- An entry evicted from the history can be recorded again if the same entry is re-submitted,
+  because its uuid is dropped from the dedup set to keep memory bounded.
+
 ### Declaring monitored fields
 
 Subclass `TrackedAttr` and list the fields to monitor in `_tracking_fields`. Declared fields
