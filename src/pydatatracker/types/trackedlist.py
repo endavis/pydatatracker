@@ -578,8 +578,7 @@ class TrackedList(TrackBase, list):
         """
         if not self._tracking_locked:
             super().sort(key=key, reverse=reverse)
-            for item in self._tracking_child_tracked_items:
-                self._tracking_child_tracked_items[item]["index"] = self.index(item)
+            self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "update"
 
@@ -599,8 +598,7 @@ class TrackedList(TrackBase, list):
         """
         if not self._tracking_locked:
             super().reverse()
-            for item in self._tracking_child_tracked_items:
-                self._tracking_child_tracked_items[item]["index"] = self.index(item)
+            self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "update"
 
