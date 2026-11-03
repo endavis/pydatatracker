@@ -148,6 +148,8 @@ class TrackedList(TrackBase, list):
 
         """
         children = self._tracking_child_tracked_items
+        if not children:
+            return
         for uuid, position in self._tracking_present_child_locations().items():
             if uuid in children:
                 children[uuid]["location"] = position

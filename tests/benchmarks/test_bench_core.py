@@ -83,3 +83,31 @@ def test_bench_trackedlist_append_with_history(benchmark: Any, history: int) -> 
         items.append(0)
 
     benchmark.pedantic(append_one, setup=setup, rounds=30, iterations=1)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("size", [1_000, 10_000, 20_000])
+def test_bench_trackedlist_insert_front_no_children(benchmark: Any, size: int) -> None:
+    """Benchmark inserting at index 0 of a childless TrackedList of `size` items."""
+
+    def setup() -> tuple[tuple[TrackedList], dict[str, Any]]:
+        return (TrackedList(list(range(size))),), {}
+
+    def insert_front(items: TrackedList) -> None:
+        items.insert(0, -1)
+
+    benchmark.pedantic(insert_front, setup=setup, rounds=30, iterations=1)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("size", [1_000, 10_000, 20_000])
+def test_bench_trackedlist_pop_front_no_children(benchmark: Any, size: int) -> None:
+    """Benchmark popping index 0 of a childless TrackedList of `size` items."""
+
+    def setup() -> tuple[tuple[TrackedList], dict[str, Any]]:
+        return (TrackedList(list(range(size))),), {}
+
+    def pop_front(items: TrackedList) -> None:
+        items.pop(0)
+
+    benchmark.pedantic(pop_front, setup=setup, rounds=30, iterations=1)
