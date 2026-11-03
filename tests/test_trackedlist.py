@@ -594,3 +594,28 @@ def test_clear_and_imul_zero_unlink_duplicated_child() -> None:
     multiplied, other = _duplicated()
     multiplied *= 0
     assert _forwarded(multiplied, other, 5) == 0
+
+
+@pytest.mark.parametrize("index", [5, -5])
+def test_tracked_list_setitem_out_of_range_leaves_no_child(index: int) -> None:
+    """An out-of-range int assignment raises before converting or linking."""
+    tracked = TrackedList([1], tracking_auto_convert=True)
+    children_before = dict(tracked._tracking_child_tracked_items)
+    changes_before = len(tracked.tracking_changes())
+
+    with pytest.raises(IndexError, match="list assignment index out of range"):
+        tracked[index] = {"x": 1}
+
+    assert list(tracked) == [1]
+    assert tracked._tracking_child_tracked_items == children_before
+    assert len(tracked.tracking_changes()) == changes_before
+
+
+def test_tracked_list_setitem_over_none_still_works() -> None:
+    """Assigning over an existing None value is an in-range update."""
+    tracked = TrackedList([None], tracking_auto_convert=True)
+
+    tracked[0] = {"x": 1}
+
+    assert isinstance(tracked[0], TrackedDict)
+    assert len(tracked._tracking_child_tracked_items) == 1
