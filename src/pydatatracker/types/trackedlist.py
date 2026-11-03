@@ -558,18 +558,6 @@ class TrackedList(TrackBase, list):
 
         self._tracking_context["action"] = "remove"
 
-    def _tracking_refresh_child_locations(self) -> None:
-        """Point each tracked child's stored location at its current index.
-
-        Children are matched by identity, so equal but distinct children keep
-        their own positions.
-        """
-        positions = {id(child): index for index, child in enumerate(self)}
-        for entry in self._tracking_child_tracked_items.values():
-            new_index = positions.get(id(entry["item"]))
-            if new_index is not None:
-                entry["location"] = new_index
-
     @check_lock
     @track_changes
     def sort(self, key: Callable | None = None, reverse: bool = False) -> None:
@@ -590,7 +578,7 @@ class TrackedList(TrackBase, list):
         """
         if not self._tracking_locked:
             super().sort(key=key, reverse=reverse)
-            self._tracking_refresh_child_locations()
+            self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "update"
 
@@ -610,7 +598,7 @@ class TrackedList(TrackBase, list):
         """
         if not self._tracking_locked:
             super().reverse()
-            self._tracking_refresh_child_locations()
+            self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "update"
 

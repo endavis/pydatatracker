@@ -524,4 +524,4 @@ def test_tracked_list_child_change_after_reverse_reports_new_location() -> None:
     tracked.reverse()
     first["a"] = 9
 
-    assert str(_latest_change(tracked).extra["location"]).startswith("1")
+    assert _latest_change(tracked).extra["location"] == "1:a"
