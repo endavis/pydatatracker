@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793703668065,
+  "lastUpdate": 1793704975071,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -907,6 +907,100 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000001654093474420399",
             "extra": "mean: 12.516402700168964 usec\nrounds: 84589"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "26d340140d6af85efb8c5a20c448574a96a8c914",
+          "message": "feat: record only init when building a tracked container (merges PR #35, addresses #24)\n\nBuilding a TrackedDict or TrackedList with contents recorded an update\nentry per initial item, because _tracking_convert_all_values re-assigned\neach item through the tracked __setitem__. That happened with or without\ntracking_auto_convert. Construction now converts items through the plain\ndict/list __setitem__ and records only init.\n\nA child is linked to its parent after it has recorded its own init and\nconverted its values, so its construction entries are no longer forwarded:\nassigning a container into a parent adds one parent entry (the add/update\nfor the assignment). _tracking_add_child_tracked_item now locks or unlocks\nthe child only when its state differs from the parent's, so new children\nno longer log a redundant unlock.\n\nLater mutations of nested children are still forwarded, and lock() still\npropagates to every descendant.\n\nBREAKING CHANGE: default change-log contents differ. Construction no\nlonger records per-item update entries; a parent no longer receives a\nchild's construction entries (init, per-item update) when the child is\nassigned; child logs no longer start with unlock. Code that counted or\nfiltered these entries, or used the forwarded child init as a creation\nrecord, should use the parent's add/update entry for the assignment,\nwhose value holds a repr of the assigned container.\n\nAddresses #24\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-03T11:21:57Z",
+          "tree_id": "dca4f3aca8a7f1f2a485b412fac6071e107449aa",
+          "url": "https://github.com/endavis/pydatatracker/commit/26d340140d6af85efb8c5a20c448574a96a8c914"
+        },
+        "date": 1793704974265,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 548.6199853036082,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0001583670102915349",
+            "extra": "mean: 1.8227553257043607 msec\nrounds: 568"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 181.6468484839124,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00033905595296753073",
+            "extra": "mean: 5.50518772192497 msec\nrounds: 187"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 568.5670806282485,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000024243156150238385",
+            "extra": "mean: 1.7588074196892156 msec\nrounds: 579"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 579.3909145853781,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000026547074172224357",
+            "extra": "mean: 1.725950433164139 msec\nrounds: 591"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[100]",
+            "value": 108506.1595231119,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000013769823562163888",
+            "extra": "mean: 9.216066667505629 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[1000]",
+            "value": 65270.4590272038,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000048897554675505414",
+            "extra": "mean: 15.320866666238922 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[10000]",
+            "value": 25399.90026304247,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000073994927949731985",
+            "extra": "mean: 39.370233333357874 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_monitored",
+            "value": 67816.24856500482,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001402908412267019",
+            "extra": "mean: 14.745728658839875 usec\nrounds: 70767"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_update",
+            "value": 2689726.5912551354,
+            "unit": "iter/sec",
+            "range": "stddev: 3.831630856788041e-8",
+            "extra": "mean: 371.78499972867485 nsec\nrounds: 200"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_declared",
+            "value": 110637.55874703832,
+            "unit": "iter/sec",
+            "range": "stddev: 8.813793657705475e-7",
+            "extra": "mean: 9.03852192080991 usec\nrounds: 114640"
           }
         ]
       }
