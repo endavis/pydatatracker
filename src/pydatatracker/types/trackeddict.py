@@ -129,7 +129,7 @@ class TrackedDict(TrackBase, dict):
 
         """
         for key, value in list(dict.items(self)):
-            dict.__setitem__(self, key, self._tracking_convert_value(value, key))
+            dict.__setitem__(self, key, self._tracking_store_item(value, key))
 
     def _tracking_present_child_locations(self) -> dict[str, Any]:
         """Map each trackable value in the dict to the first key holding it.
@@ -251,7 +251,7 @@ class TrackedDict(TrackBase, dict):
         old_item: Any = dict.__getitem__(self, key) if action == "update" else None
 
         if not self._tracking_locked:
-            value = self._tracking_convert_value(value, key)
+            value = self._tracking_store_item(value, key)
             super().__setitem__(key, value)
             if old_item is not None and old_item is not value:
                 self._tracking_context.setdefault("removed_items", []).append(old_item)
@@ -360,9 +360,11 @@ class TrackedDict(TrackBase, dict):
         removed_items: list[Hashable] = []
         transformed_data: dict[Hashable, Any] = {}
         if not self._tracking_locked:
-            transformed_data = {}
-            for key, value in dict(*args, **kwargs).items():
-                converted = self._tracking_convert_value(value, key)
+            incoming = dict(*args, **kwargs)
+            converted_values = self._tracking_store_items(
+                (value, key) for key, value in incoming.items()
+            )
+            for key, converted in zip(incoming, converted_values, strict=True):
                 if key in self and self[key] is not converted:
                     removed_items.append(self[key])
                 transformed_data[key] = converted
@@ -401,7 +403,7 @@ class TrackedDict(TrackBase, dict):
 
         if not self._tracking_locked:
             if key not in self:
-                default = self._tracking_convert_value(default, key)
+                default = self._tracking_store_item(default, key)
             default = super().setdefault(key, default)
 
         self._tracking_context["action"] = "update"

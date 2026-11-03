@@ -123,7 +123,7 @@ class TrackedList(TrackBase, list):
 
         """
         for index, value in enumerate(list(list.__iter__(self))):
-            list.__setitem__(self, index, self._tracking_convert_value(value, index))
+            list.__setitem__(self, index, self._tracking_store_item(value, index))
 
     def _tracking_present_child_locations(self) -> dict[str, Any]:
         """Map each trackable item in the list to the index of its first occurrence.
@@ -224,7 +224,7 @@ class TrackedList(TrackBase, list):
         except IndexError:
             old_item = None
 
-        item = self._tracking_convert_value(item, index)
+        item = self._tracking_store_item(item, index)
         if not self._tracking_locked:
             super().__setitem__(index, item)
 
@@ -257,10 +257,9 @@ class TrackedList(TrackBase, list):
                 f"to extended slice of size {len(old_items)}"
             )
 
-        converted = [
-            self._tracking_convert_value(value, start + position * step)
-            for position, value in enumerate(values)
-        ]
+        converted = self._tracking_store_items(
+            (value, start + position * step) for position, value in enumerate(values)
+        )
         list.__setitem__(self, index, converted)
         self._tracking_reindex_child_locations()
 
@@ -338,7 +337,7 @@ class TrackedList(TrackBase, list):
 
         if not self._tracking_locked:
             index = len(self)
-            item = self._tracking_convert_value(item, index)
+            item = self._tracking_store_item(item, index)
             super().append(item)
 
         self._tracking_context["action"] = "add"
@@ -364,12 +363,10 @@ class TrackedList(TrackBase, list):
 
         """
         if not self._tracking_locked:
-            new_data = []
             count = len(self)
-            for item in items:
-                new_item = self._tracking_convert_value(item, count)
-                new_data.append(new_item)
-                count += 1
+            new_data = self._tracking_store_items(
+                (item, count + offset) for offset, item in enumerate(items)
+            )
             super().extend(new_data)
         else:
             new_data = items
@@ -407,7 +404,8 @@ class TrackedList(TrackBase, list):
 
         ``n >= 1`` records an ``add`` for the new indexes (with ``multiplier``);
         ``n <= 0`` empties the list and records a ``remove`` that unlinks children.
-        Repeated children stay a single child entry.
+        Repeated children stay a single child entry. The ``_tracking_convert_item``
+        hook is not called: no new values are added, only existing ones repeated.
 
         Args:
             n: The repeat count.
@@ -459,7 +457,7 @@ class TrackedList(TrackBase, list):
 
         """
         if not self._tracking_locked:
-            item = self._tracking_convert_value(item, index)
+            item = self._tracking_store_item(item, index)
             super().insert(index, item)
             self._tracking_reindex_child_locations()
 

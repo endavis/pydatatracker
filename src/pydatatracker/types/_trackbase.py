@@ -47,7 +47,7 @@ import itertools
 import logging
 import weakref
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from functools import wraps
 from typing import Any, Literal
 from uuid import uuid4
@@ -346,6 +346,80 @@ class TrackBase:
                 tracking_location=location,
             )
         return value
+
+    def _tracking_convert_item(self, value: Any, location: Any = "") -> Any:
+        """Convert a value being stored in this container (override hook).
+
+        ``TrackedList`` and ``TrackedDict`` call this for every value they store:
+        construction, ``append``, ``insert``, ``extend``, ``+=``, ``__setitem__``
+        (including slices), ``update``, ``|=`` and ``setdefault`` (missing key only).
+        It runs whatever ``tracking_auto_convert`` is set to. The default delegates
+        to ``_tracking_convert_value``.
+
+        A subclass may return a wrapped value or raise (for example ``TypeError``) to
+        reject it; a rejected insert leaves the container unchanged. Construction
+        calls the hook inside ``TrackBase.__init__``, so a subclass must set any state
+        the hook needs before calling ``super().__init__()``.
+
+        Args:
+            value: The value being stored.
+            location: The index or key the value is stored at.
+
+        Returns:
+            The value to store.
+
+        """
+        return self._tracking_convert_value(value, location)
+
+    def _tracking_store_item(self, value: Any, location: Any = "") -> Any:
+        """Run the conversion hook and link a newly created trackable result as a child.
+
+        A result that is the input object (already tracked) or already a child is not
+        linked, so default behavior is unchanged.
+
+        Args:
+            value: The value being stored.
+            location: The index or key the value is stored at.
+
+        Returns:
+            The value to store.
+
+        """
+        converted = self._tracking_convert_item(value, location)
+        if (
+            converted is not value
+            and self._tracking_is_trackable(converted)
+            and converted._tracking_uuid not in self._tracking_child_tracked_items
+        ):
+            self._tracking_add_child_tracked_item(location, converted)
+        return converted
+
+    def _tracking_store_items(self, pairs: Iterable[tuple[Any, Any]]) -> list[Any]:
+        """Store several ``(value, location)`` pairs, undoing child links on failure.
+
+        If the hook raises part way, every child linked since the call began is
+        unlinked and the exception is re-raised.
+
+        Args:
+            pairs: The ``(value, location)`` pairs to convert.
+
+        Returns:
+            The converted values, in order.
+
+        """
+        before = set(self._tracking_child_tracked_items)
+        converted: list[Any] = []
+        try:
+            for value, location in pairs:
+                converted.append(self._tracking_store_item(value, location))
+        except BaseException:
+            for uuid in list(self._tracking_child_tracked_items):
+                if uuid not in before:
+                    self._tracking_remove_child_tracked_item(
+                        self._tracking_child_tracked_items[uuid]["item"]
+                    )
+            raise
+        return converted
 
     def _tracking_debug(self, message: str) -> None:
         """Log a debug message if debugging is enabled.
