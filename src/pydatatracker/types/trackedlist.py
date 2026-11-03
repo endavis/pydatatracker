@@ -125,6 +125,23 @@ class TrackedList(TrackBase, list):
         for index, value in enumerate(list(list.__iter__(self))):
             list.__setitem__(self, index, self._tracking_convert_value(value, index))
 
+    def _tracking_reindex_child_locations(self) -> None:
+        """Refresh each linked child's stored ``location`` to its current index.
+
+        Scans the list by identity and sets a child's location to the index of its
+        first occurrence. Children no longer in the list are left untouched, so a
+        child removed by the current mutation is still unlinked by ``track_changes``
+        afterwards. Call this after any mutation that shifts items.
+
+        """
+        children = self._tracking_child_tracked_items
+        seen: set[Any] = set()
+        for position, value in enumerate(list.__iter__(self)):
+            uuid = getattr(value, "_tracking_uuid", None)
+            if uuid in children and uuid not in seen:
+                seen.add(uuid)
+                children[uuid]["location"] = position
+
     def _tracking_notify_observers(self, change_log_entry: "ChangeLogEntry") -> None:
         """Notify observers of a change in the tracked dictionary.
 
@@ -235,6 +252,7 @@ class TrackedList(TrackBase, list):
             for position, value in enumerate(values)
         ]
         list.__setitem__(self, index, converted)
+        self._tracking_reindex_child_locations()
 
         removed = [old for old in old_items if not any(old is new for new in converted)]
         if removed:
@@ -268,6 +286,7 @@ class TrackedList(TrackBase, list):
         if isinstance(index, slice):
             old_items = list(list.__getitem__(self, index))
             super().__delitem__(index)
+            self._tracking_reindex_child_locations()
             self._tracking_context.setdefault("removed_items", []).extend(old_items)
             self._tracking_context["action"] = "update"
             self._tracking_context["value"] = old_items
@@ -280,6 +299,7 @@ class TrackedList(TrackBase, list):
         old_item = self[index]
         if not self._tracking_locked:
             super().__delitem__(index)
+            self._tracking_reindex_child_locations()
 
         self._tracking_context.setdefault("removed_items", []).append(old_item)
         self._tracking_context["action"] = "update"
@@ -431,6 +451,7 @@ class TrackedList(TrackBase, list):
         if not self._tracking_locked:
             item = self._tracking_convert_value(item, index)
             super().insert(index, item)
+            self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "add"
         self._tracking_context["value"] = item
@@ -464,6 +485,7 @@ class TrackedList(TrackBase, list):
 
         if not self._tracking_locked:
             super().remove(item)
+            self._tracking_reindex_child_locations()
 
         if index is not None:
             self._tracking_context.setdefault("removed_items", []).append(stored)
@@ -504,6 +526,7 @@ class TrackedList(TrackBase, list):
         item = "###^$^@$^$default###^$^@$^"
         if not self._tracking_locked:
             item = super().pop(index)
+            self._tracking_reindex_child_locations()
 
         if item != "###^$^@$^$default###^$^@$^":
             self._tracking_context.setdefault("removed_items", []).append(item)
