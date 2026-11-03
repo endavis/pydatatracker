@@ -143,7 +143,7 @@ class TrackedAttr(TrackBase):
             **record_kwargs,
         )
         self._tracking_attributes_to_monitor: list[str] = []
-        self._tracking_locked_attributes: list[str] = []
+        self._tracking_locked_attributes: set[str] = set()
         self._tracking_original_values: dict[str, Any] = {}
         self._tracking_pending_monitor: set[str] = set()
         for name in self._tracking_declared_fields:
@@ -403,7 +403,7 @@ class TrackedAttr(TrackBase):
         if not hasattr(self, attribute_name):
             return
 
-        self._tracking_locked_attributes.append(attribute_name)
+        self._tracking_locked_attributes.add(attribute_name)
         value = getattr(self, attribute_name)
         if self._tracking_is_trackable(value):
             value.lock()
@@ -437,7 +437,7 @@ class TrackedAttr(TrackBase):
             if self._tracking_is_trackable(value):
                 value.unlock()
 
-            self._tracking_locked_attributes.remove(attribute_name)
+            self._tracking_locked_attributes.discard(attribute_name)
             self.tracking_create_change(
                 action="unlock",
                 attribute_name=attribute_name,
@@ -449,7 +449,10 @@ class TrackedAttr(TrackBase):
         """Lock specified attributes to prevent modifications.
 
         This method locks the given attribute or all monitored attributes,
-        preventing changes to their values. It updates the tracking context
+        preventing changes to their values. A locked object raises
+        ``RuntimeError`` on assignment to any monitored attribute, including one
+        added to monitoring after the lock. Locking is not counted: one
+        ``unlock`` undoes any number of ``lock`` calls. It updates the tracking context
         to reflect the locking action, ensuring that data integrity is maintained.
 
         Args:
@@ -513,7 +516,9 @@ class TrackedAttr(TrackBase):
             None
 
         Raises:
-            RuntimeError: If the attribute is locked and cannot be modified.
+            RuntimeError: If the attribute is locked, or the whole object is locked
+                (``lock()``), and the attribute is monitored. Nothing is stored or
+                logged. An unmonitored attribute can still be assigned.
 
         """
         if attribute_name.startswith("_tracking_"):
@@ -532,7 +537,7 @@ class TrackedAttr(TrackBase):
             object.__setattr__(self, attribute_name, value)
             return
 
-        if self._tracking_is_locked_attribute(attribute_name):
+        if self._tracking_is_locked_attribute(attribute_name) or self._tracking_locked:
             raise RuntimeError(
                 f"{self.__class__.__name__}.{attribute_name} is locked and cannot be modified."
             )
@@ -541,29 +546,21 @@ class TrackedAttr(TrackBase):
             original_value = getattr(self, attribute_name)
         except AttributeError:
             if attribute_name in self._tracking_pending_monitor:
-                if self._tracking_locked:
-                    raise RuntimeError(
-                        f"{self.__class__.__name__}.{attribute_name} is locked and "
-                        "cannot be modified."
-                    ) from None
                 self._tracking_pending_monitor.discard(attribute_name)
                 self._tracking_start_monitoring(attribute_name, value)
                 return
             original_value = "#!NotSet"
 
-        if not self._tracking_is_tracking_attribute(attribute_name) or (
-            not (self._tracking_is_locked_attribute(attribute_name))
-            and (hasattr(self, "_tracking_locked") and not self._tracking_locked)
+        is_tracking = self._tracking_is_tracking_attribute(attribute_name)
+        if is_tracking:
+            value = self._tracking_convert_value(value, attribute_name)
+        super().__setattr__(attribute_name, value)
+        if original_value is not value and not (
+            isinstance(original_value, str) and original_value == "#!NotSet"
         ):
-            if self._tracking_is_tracking_attribute(attribute_name):
-                value = self._tracking_convert_value(value, attribute_name)
-            super().__setattr__(attribute_name, value)
-            if original_value is not value and not (
-                isinstance(original_value, str) and original_value == "#!NotSet"
-            ):
-                self._tracking_release_child(original_value)
+            self._tracking_release_child(original_value)
 
-        if self._tracking_is_tracking_attribute(attribute_name):
+        if is_tracking:
             self._tracking_attribute_change(
                 sys._getframe().f_code.co_name, attribute_name, original_value, value
             )

@@ -42,6 +42,11 @@ In-place operators (`list += x`, `list *= n`, `dict |= x`) and slice assignment 
 deletion on a `TrackedList` are tracked and respect `lock()`. A slice change is one
 `update` entry whose location is `repr(slice)`, for example `slice(0, 2, None)`.
 
+A `TrackedAttr` locked with `lock()` raises `RuntimeError` on assignment to any
+monitored attribute, including one added to monitoring after the lock, and stores and
+logs nothing. Unmonitored attributes can still be assigned. Locks are not counted: one
+`unlock()` (or `unlock(name)`) undoes any number of `lock()` calls.
+
 ### Tracking actors
 
 Set a temporary actor when mutating tracked objects to avoid stack inspection overhead:

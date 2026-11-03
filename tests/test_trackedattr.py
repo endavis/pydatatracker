@@ -612,3 +612,109 @@ def test_monitor_set_first_delete_then_reassign_unchanged() -> None:
     assert obj.a == 5
     assert "a" not in obj._tracking_pending_monitor
     assert _actions(obj)[: len(before)] == before
+
+
+# --- Lock semantics (#54) ---
+
+
+def test_locked_instance_rejects_monitor_added_after_lock() -> None:
+    obj: Any = TrackedAttr()
+    obj.x = 1
+    obj.tracking_add_attribute_to_monitor("x")
+    obj.lock()
+    obj.y = 2
+    obj.tracking_add_attribute_to_monitor("y")
+    before = len(obj.tracking_changes())
+
+    with pytest.raises(RuntimeError, match="is locked"):
+        obj.y = 9
+
+    assert obj.y == 2
+    assert len(obj.tracking_changes()) == before
+
+
+def test_global_lock_then_unlock_one_attribute_still_rejects_write() -> None:
+    obj = SampleTrackedAttr()
+    obj.lock()
+    obj.unlock("name")
+    before = len(obj.tracking_changes())
+
+    with pytest.raises(RuntimeError, match="is locked"):
+        obj.name = "zeta"
+
+    assert obj.name == "alpha"
+    assert len(obj.tracking_changes()) == before
+    assert obj._tracking_locked is True
+
+
+def test_duplicate_attribute_lock_needs_one_unlock() -> None:
+    obj = SampleTrackedAttr()
+    obj.lock("name")
+    obj.lock("name")
+    obj.unlock("name")
+
+    obj.name = "beta"
+
+    assert obj.name == "beta"
+    assert not obj._tracking_is_locked_attribute("name")
+
+
+def test_attribute_lock_then_global_lock_and_unlock_fully_unlocks() -> None:
+    obj = SampleTrackedAttr()
+    obj.lock("name")
+    obj.lock()
+    obj.unlock()
+
+    obj.name = "beta"
+    obj.profile = {"score": 2}
+
+    assert obj.name == "beta"
+    assert obj._tracking_locked_attributes == set()
+
+
+def test_repeated_global_lock_needs_one_unlock() -> None:
+    obj = SampleTrackedAttr()
+    obj.lock()
+    with pytest.raises(RuntimeError):
+        obj.name = "beta"
+    obj.unlock()
+    obj.lock()
+    obj.unlock()
+
+    obj.name = "beta"
+
+    assert obj.name == "beta"
+    assert obj._tracking_locked is False
+
+
+def test_locked_instance_allows_unmonitored_write_without_entry() -> None:
+    obj: Any = SampleTrackedAttr()
+    obj.lock()
+    before = len(obj.tracking_changes())
+
+    obj.other = 5
+
+    assert obj.other == 5
+    assert len(obj.tracking_changes()) == before
+
+
+def test_locked_instance_rejects_pending_name_first_assignment() -> None:
+    obj = TrackedAttr()
+    obj.tracking_add_attribute_to_monitor("later")
+    obj.lock()
+
+    with pytest.raises(RuntimeError, match="is locked"):
+        obj.later = 1
+
+    assert not hasattr(obj, "later")
+
+
+def test_locked_instance_still_allows_delete() -> None:
+    obj = SampleTrackedAttr()
+    obj.lock()
+    before = len(obj.tracking_changes())
+
+    del obj.name
+
+    assert not hasattr(obj, "name")
+    assert len(obj.tracking_changes()) == before
