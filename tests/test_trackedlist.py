@@ -475,3 +475,53 @@ def test_reindex_does_not_resurrect_removed_child() -> None:
     removed = tracked.pop(0)
     assert removed._tracking_uuid not in tracked._tracking_child_tracked_items
     assert len(tracked._tracking_child_tracked_items) == 1
+
+
+def _child_locations(tracked: TrackedList) -> list[object]:
+    """Return each child's stored location in list order, matched by identity."""
+    by_id = {id(e["item"]): e["location"] for e in tracked._tracking_child_tracked_items.values()}
+    return [by_id[id(child)] for child in tracked]
+
+
+def test_tracked_list_sort_with_tracked_children_updates_locations() -> None:
+    """Sorting a list of tracked children must not raise and must refresh locations."""
+    tracked = TrackedList([{"k": 2}, {"k": 1}], tracking_auto_convert=True)
+    before = len(tracked.tracking_changes())
+
+    tracked.sort(key=lambda child: child["k"])
+
+    assert [child["k"] for child in tracked] == [1, 2]
+    changes = tracked.tracking_changes()
+    assert len(changes) == before + 1
+    assert changes[-1].extra["action"] == "update"
+    assert _child_locations(tracked) == [0, 1]
+
+
+def test_tracked_list_reverse_with_tracked_children_updates_locations() -> None:
+    """Reversing must refresh locations by identity, even for equal children."""
+    tracked = TrackedList([{"a": 1}, {"a": 1}, {"a": 2}], tracking_auto_convert=True)
+    first, second, third = tracked[0], tracked[1], tracked[2]
+    before = len(tracked.tracking_changes())
+
+    tracked.reverse()
+
+    assert tracked[0] is third
+    assert tracked[1] is second
+    assert tracked[2] is first
+    changes = tracked.tracking_changes()
+    assert len(changes) == before + 1
+    assert changes[-1].extra["action"] == "update"
+    assert _child_locations(tracked) == [0, 1, 2]
+    assert tracked._tracking_child_tracked_items[first._tracking_uuid]["location"] == 2
+    assert tracked._tracking_child_tracked_items[second._tracking_uuid]["location"] == 1
+
+
+def test_tracked_list_child_change_after_reverse_reports_new_location() -> None:
+    """A later child change should log the child's post-reverse location."""
+    tracked = TrackedList([{"a": 1}, {"a": 2}], tracking_auto_convert=True)
+    first = tracked[0]
+
+    tracked.reverse()
+    first["a"] = 9
+
+    assert str(_latest_change(tracked).extra["location"]).startswith("1")
