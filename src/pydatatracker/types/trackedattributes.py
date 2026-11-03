@@ -150,9 +150,9 @@ class TrackedAttr(TrackBase):
             value: The value being assigned; converted when auto-convert is on.
 
         """
-        self._tracking_attributes_to_monitor.append(attribute_name)
         value = self._tracking_convert_value(value, attribute_name)
         object.__setattr__(self, attribute_name, value)
+        self._tracking_attributes_to_monitor.append(attribute_name)
         self._tracking_original_values[attribute_name] = value
 
     def _tracking_is_tracking_attribute(self, attribute_name: str) -> bool:
