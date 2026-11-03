@@ -144,7 +144,14 @@ def async_queue_observer(queue: Any) -> Callable[[ChangeLogEntry], None]:
 
     def _observer(change: ChangeLogEntry) -> None:
         if inspect.iscoroutinefunction(queue.put):
-            task = asyncio.create_task(_async_enqueue(change))
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError as exc:
+                raise RuntimeError(
+                    "async_queue_observer needs a running event loop to enqueue onto an "
+                    "async queue; mutate the tracked object from inside the loop"
+                ) from exc
+            task = loop.create_task(_async_enqueue(change))
             _background_tasks.add(task)
             task.add_done_callback(_background_tasks.discard)
         else:

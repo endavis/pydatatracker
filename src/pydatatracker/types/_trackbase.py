@@ -549,6 +549,11 @@ class TrackBase:
         tracked objects is registered weakly so parents and children do not form a
         reference cycle.
 
+        An observer that raises does not stop later observers. After all have run, one
+        failure is re-raised as is and several are raised as an ``ExceptionGroup``; the
+        mutation and its change entry are already committed, so do not retry. Catch
+        with ``except*`` when more than one observer may fail.
+
         Args:
             observer: The callable to be added as an observer.
             priority: The priority level of the observer.
@@ -630,13 +635,25 @@ class TrackBase:
         registered observers receive updates about changes, maintaining synchronization
         between the tracked objects and their observers.
 
+        Every live observer runs, in priority order, even when an earlier one raises.
+        Only ``Exception`` is collected; a ``BaseException`` such as ``KeyboardInterrupt``
+        propagates at once. After the loop, a single failure is re-raised as the original
+        exception object and several are raised together as an ``ExceptionGroup`` in run
+        order. Each failure gets a note naming the change entry and saying the mutation
+        and entry were already committed.
+
         Args:
             change_log_entry: The change log entry that records changes to an object.
 
         Returns:
             None
 
+        Raises:
+            Exception: The single exception an observer raised.
+            ExceptionGroup: Every exception raised, when more than one observer failed.
+
         """
+        failures: list[Exception] = []
         priorities = sorted(self._tracking_observers.keys())
         for priority in priorities:
             entries = self._tracking_observers[priority]
@@ -646,7 +663,25 @@ class TrackBase:
                     if entry in entries:
                         entries.remove(entry)
                     continue
-                observer(change_log_entry)
+                try:
+                    observer(change_log_entry)
+                except Exception as exc:
+                    failures.append(exc)
+        if not failures:
+            return
+        note = (
+            f"raised by an observer of change entry {change_log_entry.uuid} "
+            f"(action={change_log_entry.extra.get('action')}); the mutation and the "
+            "entry were already committed, so do not retry"
+        )
+        for failure in failures:
+            failure.add_note(note)
+        if len(failures) == 1:
+            raise failures[0]
+        raise ExceptionGroup(
+            f"{len(failures)} observers raised for change entry {change_log_entry.uuid}",
+            failures,
+        )
 
     def tracking_create_change(self, **kwargs: Any) -> None:
         """Create a change log entry for the tracked object.
