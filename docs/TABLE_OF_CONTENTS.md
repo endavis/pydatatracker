@@ -20,6 +20,7 @@ Complete index of all documentation, organized by audience and as a full alphabe
 - [Keeping Up to Date](template/updates.md) - Stay in sync with improvements to the pyproject-template
 - [Migration Guide](template/migration.md) - Migrate existing Python projects to use this template
 - [New Project Setup](template/new-project.md) - Create a new Python project from this template
+- [Performance](usage/performance.md) - Measured overhead of TrackedDict, TrackedList and TrackedAttr against the standard library, and how to reproduce it
 - [Production Deployment Guide](deployment/production.md) - Comprehensive guide for deploying Python applications to production
 - [pydatatracker Documentation](index.md) - Welcome and overview of the project
 - [Template Management](template/manage.md) - Unified interface for creating projects, checking updates, and syncing
@@ -84,6 +85,7 @@ Complete index of all documentation, organized by audience and as a full alphabe
 - [LSP Tool and Diagnostic Noise](development/ai/lsp-tool.md) - What the LSP tool gives an AI agent, why pyright diagnostics arrive stale, and the two opt-outs agents can flip on themselves
 - [Optional Extensions](development/extensions.md) - Additional tools and extensions for testing, security, and more
 - [Per-Stack Rule Files](development/ai/rule-files.md) - How to author, load and mirror the short self-check rule files in .claude/rules/
+- [Performance](usage/performance.md) - Measured overhead of TrackedDict, TrackedList and TrackedAttr against the standard library, and how to reproduce it
 - [Production Deployment Guide](deployment/production.md) - Comprehensive guide for deploying Python applications to production
 - [pydatatracker Documentation](index.md) - Welcome and overview of the project
 - [Python Project Coding Standards](development/coding-standards.md) - Guidelines for exceptions, typing, structure, testing, and documentation
@@ -178,6 +180,7 @@ Complete index of all documentation, organized by audience and as a full alphabe
 - [New Project Setup](template/new-project.md) - Create a new Python project from this template
 - [Optional Extensions](development/extensions.md) - Additional tools and extensions for testing, security, and more
 - [Per-Stack Rule Files](development/ai/rule-files.md) - How to author, load and mirror the short self-check rule files in .claude/rules/
+- [Performance](usage/performance.md) - Measured overhead of TrackedDict, TrackedList and TrackedAttr against the standard library, and how to reproduce it
 - [Production Deployment Guide](deployment/production.md) - Comprehensive guide for deploying Python applications to production
 - [pydatatracker Documentation](index.md) - Welcome and overview of the project
 - [Python Project Coding Standards](development/coding-standards.md) - Guidelines for exceptions, typing, structure, testing, and documentation

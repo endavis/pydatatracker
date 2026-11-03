@@ -74,6 +74,7 @@ jobs:
         run: |
           mkdir -p tmp
           uv run pytest tests/benchmarks/ \
+            --ignore=tests/benchmarks/test_bench_vs_stdlib.py \
             --benchmark-enable --benchmark-only \
             --benchmark-json=tmp/benchmark-results.json -v
 

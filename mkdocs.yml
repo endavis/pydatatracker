@@ -105,6 +105,7 @@ nav:
   - Usage:
       - Basics: usage/basics.md
       - Debugging & Observability: usage/debugging.md
+      - Performance: usage/performance.md
   - Development:
       - Architecture: development/architecture.md
       - Coding Standards: development/coding-standards.md
