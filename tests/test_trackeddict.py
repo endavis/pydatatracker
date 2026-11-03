@@ -357,3 +357,40 @@ def test_dict_ior_locked_raises_without_mutation() -> None:
 
     assert dict(tracked) == {"a": 1}
     assert len(tracked.tracking_changes()) == before
+
+
+def _duplicated() -> tuple[TrackedDict, TrackedDict]:
+    parent = TrackedDict({"a": {"state": "x"}}, tracking_auto_convert=True)
+    child = parent["a"]
+    dict.__setitem__(parent, "b", child)
+    return parent, child
+
+
+@pytest.mark.parametrize("how", ["del", "pop", "setitem", "update"])
+def test_dict_removing_one_duplicate_keeps_child_linked(how: str) -> None:
+    """Removing one key of a duplicated child leaves the other key linked."""
+    parent, child = _duplicated()
+    if how == "del":
+        del parent["a"]
+    elif how == "pop":
+        parent.pop("a")
+    elif how == "setitem":
+        parent["a"] = 1
+    else:
+        parent.update({"a": 1})
+    assert parent._tracking_child_tracked_items[child._tracking_uuid]["location"] == "b"
+    assert _forwarded(parent, child, "y") == 1
+    assert _latest_change(parent).extra["location"].startswith("b")
+
+
+def test_dict_popitem_keeps_duplicated_child_linked() -> None:
+    parent, child = _duplicated()
+    parent.popitem()
+    assert parent._tracking_child_tracked_items[child._tracking_uuid]["location"] == "a"
+    assert _forwarded(parent, child, "y") == 1
+
+
+def test_dict_clear_unlinks_duplicated_child() -> None:
+    parent, child = _duplicated()
+    parent.clear()
+    assert _forwarded(parent, child, "y") == 0

@@ -131,6 +131,20 @@ class TrackedDict(TrackBase, dict):
         for key, value in list(dict.items(self)):
             dict.__setitem__(self, key, self._tracking_convert_value(value, key))
 
+    def _tracking_present_child_locations(self) -> dict[str, Any]:
+        """Map each trackable value in the dict to the first key holding it.
+
+        Returns:
+            A dict of child ``_tracking_uuid`` to its first key in insertion order.
+
+        """
+        locations: dict[str, Any] = {}
+        for key, value in dict.items(self):
+            uuid = getattr(value, "_tracking_uuid", None)
+            if uuid is not None and uuid not in locations:
+                locations[uuid] = key
+        return locations
+
     def _tracking_notify_observers(self, change_log_entry: "ChangeLogEntry") -> None:
         """Notify observers of a change in the tracked dictionary.
 

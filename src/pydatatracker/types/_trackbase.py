@@ -147,11 +147,24 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
         # Check if the object has a tracking_context attribute (for tracking changes)
         if self._tracking_context and "action" in self._tracking_context:
             if "removed_items" in self._tracking_context:
+                # A removed child still held under another index or key stays
+                # linked and is relocated; only children no longer held are unlinked.
+                present: dict[str, Any] | None = None
+                handled: set[int] = set()
                 for olditem in self._tracking_context["removed_items"]:
-                    if self._tracking_is_trackable(olditem):
-                        if olditem._tracking_uuid in self._tracking_child_tracked_items:
-                            del self._tracking_child_tracked_items[olditem._tracking_uuid]
-                        olditem.tracking_remove_observer(self._tracking_notify_observers)
+                    if not self._tracking_is_trackable(olditem) or id(olditem) in handled:
+                        continue
+                    handled.add(id(olditem))
+                    if present is None:
+                        present = self._tracking_present_child_locations()
+                    uuid = olditem._tracking_uuid
+                    if uuid in present:
+                        if uuid in self._tracking_child_tracked_items:
+                            self._tracking_child_tracked_items[uuid]["location"] = present[uuid]
+                        continue
+                    if uuid in self._tracking_child_tracked_items:
+                        del self._tracking_child_tracked_items[uuid]
+                    olditem.tracking_remove_observer(self._tracking_notify_observers)
 
             if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in [
                 "TrackedDict",
@@ -398,6 +411,19 @@ class TrackBase:
         """
         self._tracking_child_tracked_items.pop(trackable_item._tracking_uuid, None)
         trackable_item.tracking_remove_observer(self._tracking_notify_observers)
+
+    def _tracking_present_child_locations(self) -> dict[str, Any]:
+        """Map each trackable value still held to the location of its first occurrence.
+
+        ``track_changes`` uses this to keep a removed child linked when the same
+        object is still held under another index or key. The base implementation
+        returns an empty map; containers override it.
+
+        Returns:
+            A dict of child ``_tracking_uuid`` to its current location.
+
+        """
+        return {}
 
     def _tracking_convert_all_values(self) -> None:
         """Convert all values of the instance to trackable types.
