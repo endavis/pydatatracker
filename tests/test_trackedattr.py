@@ -243,8 +243,7 @@ def test_declared_field_first_non_empty_dict_records_no_entry_for_the_field() ->
     obj = DeclaredNonEmpty({"s": 1})
 
     # The first assignment of a declared field records nothing for the field
-    # itself. The child's own construction entries may still be forwarded;
-    # how they appear in the parent log is #24 / #31, not asserted here.
+    # itself, and the child's construction entries are not forwarded (#24, #31).
     assert isinstance(obj.child, TrackedDict)
     assert not [e for e in obj.tracking_changes() if e.extra.get("location") == "child"]
 
@@ -335,3 +334,145 @@ def test_declared_class_child_inherits_max_changes() -> None:
     assert child._tracking_max_changes == 3
     assert isinstance(child._tracking_changes, deque)
     assert child._tracking_changes.maxlen == 3
+
+
+class Holder(TrackedAttr):
+    """Helper object with two dynamically monitored attributes."""
+
+    def __init__(self) -> None:
+        super().__init__(tracking_auto_convert=True)
+        self.child: object = {"s": 1}
+        self.other: object = 0
+        self.tracking_add_attribute_to_monitor("child")
+        self.tracking_add_attribute_to_monitor("other")
+
+
+def test_attr_child_construction_is_recorded_under_parent_uuid() -> None:
+    holder = Holder()
+    holder.child = {"s": 2}
+
+    entries = holder.tracking_changes()
+    assert all(e.tracked_item_uuid == holder._tracking_uuid for e in entries)
+    assert [e.extra["location"] for e in entries if e.extra["action"] == "update"] == ["child"]
+
+
+def test_attr_overwritten_child_stops_forwarding() -> None:
+    holder = Holder()
+    old = holder.child
+    assert isinstance(old, TrackedDict)
+
+    holder.child = 5
+    before = len(holder.tracking_changes())
+    old["s"] = 2
+
+    assert len(holder.tracking_changes()) == before
+    assert old._tracking_uuid not in holder._tracking_child_tracked_items
+
+
+def test_attr_live_child_and_nested_changes_are_rehomed() -> None:
+    holder = Holder()
+    holder.child = {"x": {"y": 1}, "l": [1]}
+    assert isinstance(holder.child, TrackedDict)
+
+    holder.child["x"]["y"] = 2
+    assert _latest_change(holder).extra["location"] == "child:x:y"
+    holder.child["l"].append(3)
+    assert _latest_change(holder).extra["location"].startswith("child:l")
+
+
+def test_attr_shared_child_relocates_when_first_attribute_overwritten() -> None:
+    holder = Holder()
+    child = holder.child
+    assert isinstance(child, TrackedDict)
+    holder.other = child
+
+    holder.child = 5
+    assert holder._tracking_child_tracked_items[child._tracking_uuid]["location"] == "other"
+    child["s"] = 2
+    assert _latest_change(holder).extra["location"] == "other:s"
+
+
+def test_attr_shared_child_stays_linked_when_second_attribute_overwritten() -> None:
+    holder = Holder()
+    child = holder.child
+    assert isinstance(child, TrackedDict)
+    holder.other = child
+
+    holder.other = 5
+    assert holder._tracking_child_tracked_items[child._tracking_uuid]["location"] == "child"
+    child["s"] = 2
+    assert _latest_change(holder).extra["location"] == "child:s"
+
+
+def test_attr_self_assignment_keeps_child_linked() -> None:
+    holder = Holder()
+    child = holder.child
+    assert isinstance(child, TrackedDict)
+
+    holder.child = holder.child
+    child["s"] = 2
+
+    assert _latest_change(holder).extra["location"] == "child:s"
+
+
+def test_attr_delete_unlinks_child_without_raising() -> None:
+    holder = Holder()
+    old = holder.child
+    assert isinstance(old, TrackedDict)
+
+    del holder.child
+    before = len(holder.tracking_changes())
+    old["s"] = 2
+
+    assert len(holder.tracking_changes()) == before
+    assert old._tracking_uuid not in holder._tracking_child_tracked_items
+
+
+def test_attr_other_children_forward_after_delete() -> None:
+    holder = Holder()
+    holder.other = {"k": 1}
+    other = holder.other
+    assert isinstance(other, TrackedDict)
+
+    del holder.child
+    other["k"] = 2
+
+    assert _latest_change(holder).extra["location"] == "other:k"
+
+
+def test_attr_delete_unmonitored_attribute_and_shared_child() -> None:
+    holder = Holder()
+    setattr(holder, "plain", 1)  # noqa: B010
+    delattr(holder, "plain")
+    assert not hasattr(holder, "plain")
+
+    child = holder.child
+    assert isinstance(child, TrackedDict)
+    holder.other = child
+    del holder.other
+    child["s"] = 2
+    assert _latest_change(holder).extra["location"] == "child:s"
+
+
+def test_attr_already_tracked_dict_is_not_linked_and_overwrite_is_safe() -> None:
+    holder = Holder()
+    tracked = TrackedDict({"a": 1})
+
+    holder.other = tracked
+    assert tracked._tracking_uuid not in holder._tracking_child_tracked_items
+    holder.other = 5
+
+    assert holder.other == 5
+
+
+def test_attr_declared_field_overwrite_unlinks_child() -> None:
+    obj = DeclaredNonEmpty({"s": 1})
+    old = obj.child
+    assert isinstance(old, TrackedDict)
+
+    setattr(obj, "child", 5)  # noqa: B010
+    before = len(obj.tracking_changes())
+    old["s"] = 2
+
+    assert len(obj.tracking_changes()) == before
+    assert old._tracking_uuid not in obj._tracking_child_tracked_items

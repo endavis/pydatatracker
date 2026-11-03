@@ -34,7 +34,9 @@ Constructing a container records a single `init` entry. Converting the initial i
 with or without `tracking_auto_convert`, adds no per-item entries, and a child's own
 construction entries are not forwarded to its parent. Assigning a container into a
 parent records one `add` or `update` entry on the parent whose value holds the
-assigned container.
+assigned container. Replacing or deleting a monitored `TrackedAttr` attribute stops
+forwarding from the old child, unless the same object is still held under another
+monitored attribute.
 
 In-place operators (`list += x`, `list *= n`, `dict |= x`) and slice assignment or
 deletion on a `TrackedList` are tracked and respect `lock()`. A slice change is one

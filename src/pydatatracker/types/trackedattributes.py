@@ -196,6 +196,37 @@ class TrackedAttr(TrackBase):
             return False
         return attribute_name in self._tracking_locked_attributes
 
+    def _tracking_present_child_locations(self) -> dict[str, Any]:
+        """Map each trackable monitored value to the first attribute holding it.
+
+        Returns:
+            A dict of child ``_tracking_uuid`` to its first monitored attribute name.
+
+        """
+        locations: dict[str, Any] = {}
+        for name in self._tracking_attributes_to_monitor:
+            uuid = getattr(self.__dict__.get(name), "_tracking_uuid", None)
+            if uuid is not None and uuid not in locations:
+                locations[uuid] = name
+        return locations
+
+    def _tracking_release_child(self, old_value: Any) -> None:
+        """Unlink a child that is no longer held, or relocate it if still held.
+
+        Args:
+            old_value: The value that was replaced or deleted.
+
+        """
+        if not self._tracking_is_trackable(old_value):
+            return
+        uuid = old_value._tracking_uuid
+        present = self._tracking_present_child_locations()
+        if uuid in present:
+            if uuid in self._tracking_child_tracked_items:
+                self._tracking_child_tracked_items[uuid]["location"] = present[uuid]
+            return
+        self._tracking_remove_child_tracked_item(old_value)
+
     def _tracking_notify_observers(self, change_log_entry: "ChangeLogEntry") -> None:
         """Notify observers of attribute changes.
 
@@ -212,27 +243,21 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        if change_log_entry.tracked_item_uuid != self._tracking_uuid:
-            for item in self._tracking_attributes_to_monitor:
-                value = getattr(self, item)
-                if (
-                    self._tracking_is_trackable(value)
-                    and value._tracking_uuid == change_log_entry.tracked_item_uuid
-                ):
-                    new_change = change_log_entry.copy(
-                        change_log_entry.extra["type"], self._tracking_uuid
-                    )
-                    new_change.add_to_tree(self._tracking_format_tree_location(item))
-                    if "location" in new_change.extra:
-                        new_change.extra["location"] = (
-                            f"{item}{value._tracking_delimiter}{new_change.extra['location']}"
-                        )
-                    else:
-                        new_change.extra["location"] = f"{item}"
-
-                    change_log_entry = new_change
-
-                    break
+        if (
+            change_log_entry.tracked_item_uuid != self._tracking_uuid
+            and change_log_entry.tracked_item_uuid in self._tracking_child_tracked_items
+        ):
+            child = self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid]
+            location = child["location"]
+            new_change = change_log_entry.copy(change_log_entry.extra["type"], self._tracking_uuid)
+            new_change.add_to_tree(self._tracking_format_tree_location(location))
+            if "location" in new_change.extra:
+                new_change.extra["location"] = (
+                    f"{location}{child['item']._tracking_delimiter}{new_change.extra['location']}"
+                )
+            else:
+                new_change.extra["location"] = f"{location}"
+            change_log_entry = new_change
 
         self._tracking_record_change(change_log_entry)
         super()._tracking_notify_observers(change_log_entry)
@@ -457,6 +482,8 @@ class TrackedAttr(TrackBase):
         retrieves the original value of the attribute and, if the attribute is
         being tracked, converts the new value if necessary. Finally, it updates
         the attribute value and logs the change if the attribute is being tracked.
+        A replaced child stops forwarding its changes unless the same object is
+        still held under another monitored attribute.
 
         Args:
             attribute_name: The name of the attribute to set.
@@ -502,11 +529,34 @@ class TrackedAttr(TrackBase):
             if self._tracking_is_tracking_attribute(attribute_name):
                 value = self._tracking_convert_value(value, attribute_name)
             super().__setattr__(attribute_name, value)
+            if original_value is not value and not (
+                isinstance(original_value, str) and original_value == "#!NotSet"
+            ):
+                self._tracking_release_child(original_value)
 
         if self._tracking_is_tracking_attribute(attribute_name):
             self._tracking_attribute_change(
                 sys._getframe().f_code.co_name, attribute_name, original_value, value
             )
+
+    def __delattr__(self, attribute_name: str) -> None:
+        """Delete an attribute, releasing a monitored attribute's child.
+
+        A deleted monitored child is unlinked (or relocated when the same object is
+        still held under another monitored attribute). No change entry is recorded
+        and no lock check is made.
+
+        Args:
+            attribute_name: The name of the attribute to delete.
+
+        """
+        monitored = self.__dict__.get("_tracking_attributes_to_monitor")
+        if monitored is None or attribute_name not in monitored:
+            object.__delattr__(self, attribute_name)
+            return
+        old_value = self.__dict__.get(attribute_name)
+        object.__delattr__(self, attribute_name)
+        self._tracking_release_child(old_value)
 
     def _tracking_known_uuids_tree(
         self, level: int = 0, attribute_name: str = "", emptybar: dict | None = None
