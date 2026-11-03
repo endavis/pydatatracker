@@ -117,6 +117,18 @@ def test_list_setitem_int() -> None:
     _text_child_forwards(tracked, tracked[1])
 
 
+@pytest.mark.parametrize("index", [5, -5])
+def test_list_setitem_out_of_range_leaves_no_child(index: int) -> None:
+    tracked = RecordList([1, TrackedDict({"text": "kept"})])
+    children_before = _children(tracked)
+    changes_before = len(tracked.tracking_changes())
+    with pytest.raises(IndexError, match="list assignment index out of range"):
+        tracked[index] = "b"
+    assert len(tracked) == 2
+    assert _children(tracked) == children_before
+    assert len(tracked.tracking_changes()) == changes_before
+
+
 @pytest.mark.parametrize(
     ("key", "expected"),
     [(slice(0, 1), [("a", 0), ("b", 1)]), (slice(0, 4, 2), [("a", 0), ("b", 2)])],

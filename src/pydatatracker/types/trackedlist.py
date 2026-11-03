@@ -209,6 +209,8 @@ class TrackedList(TrackBase, list):
 
         Raises:
             TypeError: If the index is neither an integer nor a slice.
+            IndexError: If an int index is out of range; nothing is converted, linked
+                or recorded.
             ValueError: If an extended slice is assigned a sequence of the wrong size.
 
         """
@@ -222,7 +224,7 @@ class TrackedList(TrackBase, list):
         try:
             old_item = self[index]
         except IndexError:
-            old_item = None
+            raise IndexError("list assignment index out of range") from None
 
         item = self._tracking_store_item(item, index)
         if not self._tracking_locked:
