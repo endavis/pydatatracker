@@ -57,6 +57,21 @@ from uuid import uuid4
 from ..utils.changelog import ChangeLogEntry
 from .actor import current_actor
 
+# Resolved on first use: the tracked types import this module, so they cannot
+# be imported at module level here.
+_trackable_classes: tuple[type, type, type] | None = None
+
+
+def _load_trackable_classes() -> tuple[type, type, type]:
+    """Import and cache the (TrackedDict, TrackedList, TrackedAttr) classes."""
+    global _trackable_classes
+    from .trackedattributes import TrackedAttr
+    from .trackeddict import TrackedDict
+    from .trackedlist import TrackedList
+
+    _trackable_classes = (TrackedDict, TrackedList, TrackedAttr)
+    return _trackable_classes
+
 
 def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
     """Ensure methods are not called on locked objects.
@@ -851,15 +866,16 @@ class TrackBase:
             if the object is not trackable.
 
         """
-        from .trackedattributes import TrackedAttr
-        from .trackeddict import TrackedDict
-        from .trackedlist import TrackedList
+        classes = _trackable_classes
+        if classes is None:
+            classes = _load_trackable_classes()
+        tracked_dict, tracked_list, tracked_attr = classes
 
-        if isinstance(obj, TrackedDict):
+        if isinstance(obj, tracked_dict):
             return "TrackedDict"
-        elif isinstance(obj, TrackedList):
+        elif isinstance(obj, tracked_list):
             return "TrackedList"
-        elif isinstance(obj, TrackedAttr):
+        elif isinstance(obj, tracked_attr):
             return "TrackedAttr"
         return ""
 
