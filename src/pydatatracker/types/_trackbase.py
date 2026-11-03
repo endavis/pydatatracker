@@ -265,7 +265,7 @@ class TrackBase:
         self._tracking_debug_flag = False
         self._tracking_capture_snapshots = kwargs.get("tracking_capture_snapshots", False)
         self._tracking_capture_stack = kwargs.get("tracking_capture_stack", False)
-        if tracking_parent:
+        if tracking_parent is not None:
             self._tracking_capture_snapshots = getattr(
                 tracking_parent, "_tracking_capture_snapshots", False
             )
@@ -281,7 +281,7 @@ class TrackBase:
             self._tracking_capture_snapshots = kwargs["tracking_capture_snapshots"]
         if "tracking_capture_stack" in kwargs:
             self._tracking_capture_stack = kwargs["tracking_capture_stack"]
-        if tracking_parent:
+        if tracking_parent is not None:
             tracking_parent._tracking_add_child_tracked_item(tracking_location, self)
 
         if self._tracking_record_init:

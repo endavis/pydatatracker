@@ -186,7 +186,7 @@ class TrackedList(TrackBase, list):
         if not self._tracking_locked:
             super().__setitem__(index, item)
 
-        if old_item:
+        if old_item is not None and old_item is not item:
             self._tracking_context.setdefault("removed_items", []).append(old_item)
         self._tracking_context["action"] = "update"
         self._tracking_context["value"] = item
@@ -346,12 +346,13 @@ class TrackedList(TrackBase, list):
             index = super().index(item)
         except ValueError:
             index = None
+        stored = self[index] if index is not None else None
 
         if not self._tracking_locked:
             super().remove(item)
 
-        if index:
-            self._tracking_context.setdefault("removed_items", []).append(item)
+        if index is not None:
+            self._tracking_context.setdefault("removed_items", []).append(stored)
 
         self._tracking_context["action"] = "remove"
         self._tracking_context["value"] = item
