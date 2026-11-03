@@ -248,7 +248,7 @@ class ChangeLogEntry:
         """
         extra = self.extra.copy()
         extra["type"] = new_type
-        new_log = ChangeLogEntry(new_item_uuid, **extra)
+        new_log = ChangeLogEntry(new_item_uuid, capture_stack=False, **extra)
         new_log.created_time = self.created_time
         new_log.stack = self.stack
         new_log.actor = self.actor
