@@ -67,7 +67,9 @@ class TrackedAttr(TrackBase):
     across the MRO (parent fields first). A class that declares fields defaults to
     not recording the ``init`` entry; pass ``tracking_record_init=True`` or set
     ``_tracking_record_init = True`` on the class to keep it. Attributes added
-    with ``tracking_add_attribute_to_monitor`` still record ``start monitoring``.
+    with ``tracking_add_attribute_to_monitor`` still record ``start monitoring``;
+    their names may be registered before they are set, and the first assignment
+    then records ``start monitoring``.
 
     """
 
@@ -143,6 +145,7 @@ class TrackedAttr(TrackBase):
         self._tracking_attributes_to_monitor: list[str] = []
         self._tracking_locked_attributes: list[str] = []
         self._tracking_original_values: dict[str, Any] = {}
+        self._tracking_pending_monitor: set[str] = set()
         for name in self._tracking_declared_fields:
             if name in self.__dict__ or hasattr(type(self), name):
                 self._tracking_start_declared_field(name, getattr(self, name))
@@ -262,14 +265,34 @@ class TrackedAttr(TrackBase):
         self._tracking_record_change(change_log_entry)
         super()._tracking_notify_observers(change_log_entry)
 
+    def _tracking_start_monitoring(self, attribute_name: str, value: Any) -> None:
+        """Convert a monitored attribute's value, store it and log ``start monitoring``.
+
+        Args:
+            attribute_name: The monitored attribute name.
+            value: The raw value; it is recorded unconverted in the change log.
+
+        """
+        converted = self._tracking_convert_value(value, attribute_name)
+        super().__setattr__(attribute_name, converted)
+        self.tracking_create_change(
+            action="start monitoring",
+            location=f"{attribute_name}",
+            value=value,
+        )
+
     def tracking_add_attribute_to_monitor(self, attribute_name: str) -> None:
         """Add an attribute to the monitoring list.
 
-        This method adds the specified attribute to the list of attributes being
-        monitored. If the attribute exists and is not already being monitored, it
-        is appended to the monitoring list, and its original value is stored. The
-        attribute value is then converted if necessary, and a change log entry is
-        created to record the start of monitoring.
+        If the attribute exists and is not already monitored, it is appended to
+        the monitoring list, its value is converted if necessary, and a
+        ``start monitoring`` change log entry is created.
+
+        If the attribute is not set yet, its name is registered straight away and
+        the first assignment records the same ``start monitoring`` entry (and
+        raises ``RuntimeError`` while the whole object is locked). A declared
+        field that is still unset is left to its declared path: its first
+        assignment records no entry.
 
         Args:
             attribute_name: The name of the attribute to be monitored.
@@ -278,19 +301,16 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        if (
-            hasattr(self, attribute_name)
-            and attribute_name not in self._tracking_attributes_to_monitor
-        ):
+        if attribute_name in self._tracking_attributes_to_monitor:
+            return
+        if hasattr(self, attribute_name):
             self._tracking_attributes_to_monitor.append(attribute_name)
-            original_value = value = getattr(self, attribute_name)
-            value = self._tracking_convert_value(value, attribute_name)
-            super().__setattr__(attribute_name, value)
-            self.tracking_create_change(
-                action="start monitoring",
-                location=f"{attribute_name}",
-                value=original_value,
-            )
+            self._tracking_start_monitoring(attribute_name, getattr(self, attribute_name))
+            return
+        if attribute_name in self._tracking_declared_fields:
+            return
+        self._tracking_attributes_to_monitor.append(attribute_name)
+        self._tracking_pending_monitor.add(attribute_name)
 
     def _tracking_attribute_change(
         self, method: str, attribute_name: str, original_value: Any, new_value: Any
@@ -520,6 +540,15 @@ class TrackedAttr(TrackBase):
         try:
             original_value = getattr(self, attribute_name)
         except AttributeError:
+            if attribute_name in self._tracking_pending_monitor:
+                if self._tracking_locked:
+                    raise RuntimeError(
+                        f"{self.__class__.__name__}.{attribute_name} is locked and "
+                        "cannot be modified."
+                    ) from None
+                self._tracking_pending_monitor.discard(attribute_name)
+                self._tracking_start_monitoring(attribute_name, value)
+                return
             original_value = "#!NotSet"
 
         if not self._tracking_is_tracking_attribute(attribute_name) or (
@@ -603,7 +632,10 @@ class TrackedAttr(TrackBase):
                 left.remove(attribute_name)
                 if not left:
                     emptybar[level] = True
-                value = getattr(self, attribute_name)
+                try:
+                    value = getattr(self, attribute_name)
+                except AttributeError:
+                    continue
                 if self._tracking_is_trackable(value):
                     known_uuids.append(
                         f"{pre_string} |-> Location: {attribute_name} Item: "

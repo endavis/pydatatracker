@@ -115,7 +115,8 @@ fields do not record the `init` entry by default. Pass `tracking_record_init=Tru
 `_tracking_record_init = True` on the class) to keep it, or `tracking_record_init=False` on
 `TrackedDict` / `TrackedList` / `TrackedAttr` to drop it. Children inherit the setting from
 their parent. `tracking_add_attribute_to_monitor` still records `start monitoring` for
-dynamic attributes.
+dynamic attributes. You may call it before the attribute is set: the name is registered at
+once and the first assignment records `start monitoring`, the same log as setting first.
 
 ### Converting items on insert
 
