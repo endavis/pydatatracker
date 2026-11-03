@@ -55,7 +55,7 @@ class _Monitored(TrackedAttr):
     def __init__(self) -> None:
         super().__init__()
         self.a = 1
-        # Monitoring only registers an attribute that already exists.
+        # Monitoring a name that is already set records "start monitoring" now.
         self.tracking_add_attribute_to_monitor("a")
 
 

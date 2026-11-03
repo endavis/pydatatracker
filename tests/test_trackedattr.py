@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pytest
 
@@ -476,3 +476,139 @@ def test_attr_declared_field_overwrite_unlinks_child() -> None:
 
     assert len(obj.tracking_changes()) == before
     assert old._tracking_uuid not in obj._tracking_child_tracked_items
+
+
+class MonitorFirst(TrackedAttr):
+    """Monitors ``a`` before it is set."""
+
+    a: Any
+
+    def __init__(self) -> None:
+        super().__init__(tracking_auto_convert=True)
+        self.tracking_add_attribute_to_monitor("a")
+
+
+def _actions(tracked: TrackedAttr) -> list[str]:
+    return [e.extra["action"] for e in tracked.tracking_changes()]
+
+
+def test_monitor_before_set_records_start_then_update() -> None:
+    obj = MonitorFirst()
+    assert "a" in obj._tracking_attributes_to_monitor
+
+    obj.a = 1
+    obj.a = 2
+
+    assert _actions(obj) == ["init", "start monitoring", "update"]
+
+
+def test_monitor_first_log_matches_set_first_log() -> None:
+    first = MonitorFirst()
+    first.a = 1
+    first.a = 2
+
+    second: Any = TrackedAttr(tracking_auto_convert=True)
+    second.a = 1
+    second.tracking_add_attribute_to_monitor("a")
+    second.a = 2
+
+    keys = ("action", "location", "value", "data_pre_change")
+    got = [tuple(e.extra.get(k) for k in keys) for e in first.tracking_changes()]
+    want = [tuple(e.extra.get(k) for k in keys) for e in second.tracking_changes()]
+    assert got == want
+
+
+def test_monitor_before_set_read_raises_attribute_error() -> None:
+    obj = MonitorFirst()
+
+    with pytest.raises(AttributeError):
+        _ = obj.a
+
+
+def test_monitor_unset_twice_registers_once() -> None:
+    obj = MonitorFirst()
+    obj.tracking_add_attribute_to_monitor("a")
+    obj.a = 1
+
+    assert obj._tracking_attributes_to_monitor.count("a") == 1
+    assert _actions(obj).count("start monitoring") == 1
+
+
+def test_monitor_before_set_global_lock_blocks_first_assignment() -> None:
+    obj = MonitorFirst()
+    obj.lock()
+
+    with pytest.raises(RuntimeError):
+        obj.a = 1
+
+    assert not hasattr(obj, "a")
+
+
+def test_monitor_before_set_attribute_lock_is_noop_for_unset() -> None:
+    obj = MonitorFirst()
+    obj.lock("a")
+
+    obj.a = 1
+
+    assert _actions(obj) == ["init", "start monitoring"]
+
+
+def test_monitor_before_set_delete_raises_attribute_error() -> None:
+    obj = MonitorFirst()
+
+    with pytest.raises(AttributeError):
+        del obj.a
+
+
+def test_monitor_before_set_container_is_converted_and_linked() -> None:
+    obj = MonitorFirst()
+    obj.a = {"k": 1}
+
+    assert isinstance(obj.a, TrackedDict)
+    assert obj.a._tracking_uuid in obj._tracking_child_tracked_items
+    before = len(obj.tracking_changes())
+    obj.a["k"] = 2
+    assert len(obj.tracking_changes()) == before + 1
+
+
+def test_monitor_before_set_known_uuids_tree_does_not_raise() -> None:
+    obj = MonitorFirst()
+
+    assert isinstance(obj._tracking_known_uuids_tree(), list)
+
+
+def test_monitor_before_set_notifies_observer_on_first_assignment() -> None:
+    obj = MonitorFirst()
+    seen: list[ChangeLogEntry] = []
+    obj.tracking_add_observer(seen.append)
+
+    obj.a = 1
+
+    assert [e.extra["action"] for e in seen] == ["start monitoring"]
+
+
+def test_monitor_unset_declared_field_records_nothing_on_first_assignment() -> None:
+    class Declared(TrackedAttr):
+        _tracking_fields: ClassVar[tuple[str, ...]] = ("a",)
+
+    obj = Declared(tracking_record_init=False)
+    obj.tracking_add_attribute_to_monitor("a")
+    obj.a = 1
+    assert obj.tracking_changes() == []
+
+    obj.a = 2
+    assert _actions(obj) == ["update"]
+
+
+def test_monitor_set_first_delete_then_reassign_unchanged() -> None:
+    obj: Any = TrackedAttr()
+    obj.a = 1
+    obj.tracking_add_attribute_to_monitor("a")
+    del obj.a
+    before = _actions(obj)
+
+    obj.a = 5
+
+    assert obj.a == 5
+    assert "a" not in obj._tracking_pending_monitor
+    assert _actions(obj)[: len(before)] == before
