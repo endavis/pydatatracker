@@ -619,3 +619,33 @@ def test_tracked_list_setitem_over_none_still_works() -> None:
 
     assert isinstance(tracked[0], TrackedDict)
     assert len(tracked._tracking_child_tracked_items) == 1
+
+
+def test_tracked_list_front_mutations_skip_scan_without_children(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A list with no linked children does not scan its items to reindex locations."""
+    tracked = TrackedList([1, 2, 3])
+    calls: list[int] = []
+
+    def spy() -> dict[str, object]:
+        calls.append(1)
+        return {}
+
+    monkeypatch.setattr(tracked, "_tracking_present_child_locations", spy)
+
+    tracked.insert(0, 0)
+    tracked.pop(0)
+
+    assert calls == []
+    assert list(tracked) == [1, 2, 3]
+
+
+def test_tracked_list_insert_front_reindexes_children() -> None:
+    """Linked children still get their location refreshed after insert(0)."""
+    tracked = TrackedList([{"a": 1}, {"b": 2}], tracking_auto_convert=True)
+
+    tracked.insert(0, 5)
+
+    locations = sorted(c["location"] for c in tracked._tracking_child_tracked_items.values())
+    assert locations == [1, 2]
