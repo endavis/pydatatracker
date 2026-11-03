@@ -41,7 +41,7 @@ tracked = TrackedDict()
 with tracking_actor("provisioner"):
     tracked["status"] = "ready"
 
-print(tracked.tracking_changes()[0].actor)  # => provisioner
+print(tracked.tracking_changes()[-1].actor)  # => provisioner
 ```
 
 Snapshots (`tracking_capture_snapshots=True`), stack capture (`tracking_capture_stack=True`),
