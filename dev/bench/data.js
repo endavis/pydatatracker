@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793702483804,
+  "lastUpdate": 1793703164771,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -719,6 +719,100 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000010305758244549855",
             "extra": "mean: 9.170750674877784 usec\nrounds: 113727"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d7f5a924c94ae820d93f31b77f0085e94b796e3a",
+          "message": "fix: link children assigned into an empty tracked container (merges PR #33, addresses #22)\n\nTrackBase.__init__ tested `if tracking_parent:`. An empty TrackedDict or\nTrackedList parent is falsy, so a child assigned via __setitem__, update,\nsetdefault, append, insert or extend was converted but never linked: its\nchanges did not reach the parent, and it did not inherit the parent's\nsnapshot, stack or record-init settings. Both checks now use\n`is not None`.\n\nLinking more children exposed unlink leaks, fixed here too:\n- TrackedDict.__setitem__ now reports an overwritten child as removed\n- TrackedDict.__delitem__ and TrackedList.__setitem__ no longer skip an\n  empty old child (truthiness check)\n- TrackedList.remove unlinks the stored object, including at index 0\n- re-assigning the same object (setitem/update) keeps the child linked\n\ntest_tracked_dict_child_updates_do_not_touch_parent_log asserted the\nunlinked behaviour; it is rewritten as\ntest_tracked_dict_setitem_child_updates_forward_to_parent, with the\nrepo admin's approval.\n\nAddresses #22\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-03T10:51:56Z",
+          "tree_id": "d47a0cba5fa81b06466316040dd687d355655098",
+          "url": "https://github.com/endavis/pydatatracker/commit/d7f5a924c94ae820d93f31b77f0085e94b796e3a"
+        },
+        "date": 1793703164441,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 633.266037966941,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013561874721288413",
+            "extra": "mean: 1.5791151586313301 msec\nrounds: 643"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 220.78722363781608,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000261966634811898",
+            "extra": "mean: 4.52924758744383 msec\nrounds: 223"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 630.4629019394056,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013421558880486204",
+            "extra": "mean: 1.586136150000006 msec\nrounds: 640"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 627.1089871512322,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003457594512505327",
+            "extra": "mean: 1.5946191499227267 msec\nrounds: 647"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[100]",
+            "value": 110748.92110976079,
+            "unit": "iter/sec",
+            "range": "stddev: 4.316218562861631e-7",
+            "extra": "mean: 9.0294333342437 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[1000]",
+            "value": 69177.98111107439,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016395941409922577",
+            "extra": "mean: 14.455466666400223 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[10000]",
+            "value": 28013.637038722096,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000065931794090146486",
+            "extra": "mean: 35.69689999973018 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_monitored",
+            "value": 76579.19222153322,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001340996701363604",
+            "extra": "mean: 13.058377491200687 usec\nrounds: 85602"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_update",
+            "value": 2852212.602471992,
+            "unit": "iter/sec",
+            "range": "stddev: 6.230568976943861e-8",
+            "extra": "mean: 350.60500017891627 nsec\nrounds: 200"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_declared",
+            "value": 131742.2428183742,
+            "unit": "iter/sec",
+            "range": "stddev: 8.705403289166725e-7",
+            "extra": "mean: 7.590579745774066 usec\nrounds: 142390"
           }
         ]
       }
