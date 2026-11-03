@@ -125,21 +125,31 @@ class TrackedList(TrackBase, list):
         for index, value in enumerate(list(list.__iter__(self))):
             list.__setitem__(self, index, self._tracking_convert_value(value, index))
 
+    def _tracking_present_child_locations(self) -> dict[str, Any]:
+        """Map each trackable item in the list to the index of its first occurrence.
+
+        Returns:
+            A dict of child ``_tracking_uuid`` to its first index in the list.
+
+        """
+        locations: dict[str, Any] = {}
+        for position, value in enumerate(list.__iter__(self)):
+            uuid = getattr(value, "_tracking_uuid", None)
+            if uuid is not None and uuid not in locations:
+                locations[uuid] = position
+        return locations
+
     def _tracking_reindex_child_locations(self) -> None:
         """Refresh each linked child's stored ``location`` to its current index.
 
-        Scans the list by identity and sets a child's location to the index of its
-        first occurrence. Children no longer in the list are left untouched, so a
-        child removed by the current mutation is still unlinked by ``track_changes``
-        afterwards. Call this after any mutation that shifts items.
+        Uses the first occurrence of each child. Children no longer in the list are
+        left untouched, so a child removed by the current mutation is still unlinked
+        by ``track_changes`` afterwards. Call this after any mutation that shifts items.
 
         """
         children = self._tracking_child_tracked_items
-        seen: set[Any] = set()
-        for position, value in enumerate(list.__iter__(self)):
-            uuid = getattr(value, "_tracking_uuid", None)
-            if uuid in children and uuid not in seen:
-                seen.add(uuid)
+        for uuid, position in self._tracking_present_child_locations().items():
+            if uuid in children:
                 children[uuid]["location"] = position
 
     def _tracking_notify_observers(self, change_log_entry: "ChangeLogEntry") -> None:

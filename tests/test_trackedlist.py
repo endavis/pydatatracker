@@ -525,3 +525,72 @@ def test_tracked_list_child_change_after_reverse_reports_new_location() -> None:
     first["a"] = 9
 
     assert _latest_change(tracked).extra["location"] == "1:a"
+
+
+def _duplicated() -> tuple[TrackedList, TrackedDict]:
+    parent = TrackedList([{"state": 0}], tracking_auto_convert=True)
+    child = parent[0]
+    parent.extend(["x", child])
+    return parent, child
+
+
+def _remove_first_copy(parent: TrackedList, how: str) -> None:
+    if how == "pop":
+        parent.pop(0)
+    elif how == "remove":
+        parent.remove(parent[0])
+    elif how == "del_int":
+        del parent[0]
+    elif how == "del_slice":
+        del parent[0:1]
+    elif how == "slice_set":
+        parent[0:1] = ["y"]
+    else:
+        parent[0] = "y"
+
+
+@pytest.mark.parametrize("how", ["pop", "remove", "del_int", "del_slice", "slice_set", "set_int"])
+def test_removing_one_duplicate_keeps_child_linked(how: str) -> None:
+    """Removing one copy of a duplicated child leaves the other copy linked."""
+    parent, child = _duplicated()
+    _remove_first_copy(parent, how)
+    expected = 2 if how in ("set_int", "slice_set") else 1
+    assert parent._tracking_child_tracked_items[child._tracking_uuid]["location"] == expected
+    assert _forwarded(parent, child, 5) == 1
+    assert _latest_change(parent).extra["location"].startswith(str(expected))
+
+
+def test_extend_with_own_child_then_pop_keeps_link() -> None:
+    """The issue's repro: extend([tl[0]]) then pop(0)."""
+    parent = TrackedList([{"state": 0}], tracking_auto_convert=True)
+    child = parent[0]
+    parent.extend([parent[0]])
+    parent.pop(0)
+    assert _forwarded(parent, child, 5) == 1
+    _assert_child_location(parent, 0, "state")
+
+
+def test_imul_then_pop_keeps_child_linked() -> None:
+    parent = TrackedList([{"state": 0}], tracking_auto_convert=True)
+    child = parent[0]
+    parent *= 2
+    parent.pop(0)
+    assert _forwarded(parent, child, 5) == 1
+
+
+def test_removing_both_duplicates_unlinks_after_second() -> None:
+    parent, child = _duplicated()
+    parent.pop(0)
+    assert _forwarded(parent, child, 5) == 1
+    parent.pop(1)
+    assert _forwarded(parent, child, 6) == 0
+
+
+def test_clear_and_imul_zero_unlink_duplicated_child() -> None:
+    cleared, child = _duplicated()
+    cleared.clear()
+    assert _forwarded(cleared, child, 5) == 0
+
+    multiplied, other = _duplicated()
+    multiplied *= 0
+    assert _forwarded(multiplied, other, 5) == 0
