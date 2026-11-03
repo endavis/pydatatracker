@@ -197,7 +197,7 @@ class TrackedDict(TrackBase, dict):
         if not self._tracking_locked:
             super().__delitem__(key)
 
-        if old_item:
+        if old_item is not None:
             self._tracking_context.setdefault("removed_items", []).append(old_item)
         self._tracking_context["action"] = "update"
         self._tracking_context["value"] = old_item
@@ -226,10 +226,13 @@ class TrackedDict(TrackBase, dict):
 
         """
         action = "update" if key in self else "add"
+        old_item: Any = dict.__getitem__(self, key) if action == "update" else None
 
         if not self._tracking_locked:
             value = self._tracking_convert_value(value, key)
             super().__setitem__(key, value)
+            if old_item is not None and old_item is not value:
+                self._tracking_context.setdefault("removed_items", []).append(old_item)
 
         self._tracking_context["action"] = action
         self._tracking_context["value"] = value
@@ -337,9 +340,10 @@ class TrackedDict(TrackBase, dict):
         if not self._tracking_locked:
             transformed_data = {}
             for key, value in dict(*args, **kwargs).items():
-                if key in self:
+                converted = self._tracking_convert_value(value, key)
+                if key in self and self[key] is not converted:
                     removed_items.append(self[key])
-                transformed_data[key] = self._tracking_convert_value(value, key)
+                transformed_data[key] = converted
             super().update(transformed_data)
 
         self._tracking_context["action"] = "update"

@@ -28,7 +28,7 @@ print(len(payload.tracking_changes()))
 ```
 
 `TrackedDict`, `TrackedList` and `TrackedAttr` can be nested; changes to children are
-reported through the parent.
+reported through the parent, including children assigned after construction.
 
 ### Tracking actors
 

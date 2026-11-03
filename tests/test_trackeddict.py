@@ -23,19 +23,18 @@ def test_tracked_dict_pop_logs_removed_items() -> None:
     assert "pending" in change.extra["removed_items"]
 
 
-def test_tracked_dict_child_updates_do_not_touch_parent_log() -> None:
-    """Changing a nested trackable currently leaves the parent log untouched."""
+def test_tracked_dict_setitem_child_updates_forward_to_parent() -> None:
+    """A child assigned via __setitem__ into an empty parent forwards its changes."""
     parent = TrackedDict(tracking_auto_convert=True)
     parent["child"] = {"state": "draft"}
+    before = len(parent.tracking_changes())
 
-    child = parent["child"]
-    child["state"] = "final"
+    parent["child"]["state"] = "final"
 
     change = _latest_change(parent)
-    assert change.extra["location"] == "child"
-    assert "state" in change.extra["value"]
-    assert "draft" in change.extra["value"]
-    assert len(parent.tracking_changes()) == 2  # no additional entry added
+    assert change.extra["location"] == "child:state"
+    assert change.extra["value"] == "final"
+    assert len(parent.tracking_changes()) == before + 1
 
 
 def test_tracked_dict_child_tracks_its_own_updates() -> None:
@@ -156,3 +155,73 @@ def test_tracked_dict_record_init_false_has_no_entries() -> None:
 def test_tracked_dict_default_records_init() -> None:
     changes = TrackedDict().tracking_changes()
     assert [c.extra["action"] for c in changes] == ["init"]
+
+
+def _forwarded(parent: TrackedDict, child: TrackedDict, value: str) -> int:
+    before = len(parent.tracking_changes())
+    child["state"] = value
+    return len(parent.tracking_changes()) - before
+
+
+def test_tracked_dict_update_and_setdefault_link_child_in_empty_parent() -> None:
+    """update and setdefault on an empty parent link the new child."""
+    via_update = TrackedDict(tracking_auto_convert=True)
+    via_update.update({"c": {"state": "a"}})
+    assert _forwarded(via_update, via_update["c"], "b") == 1
+
+    via_default = TrackedDict(tracking_auto_convert=True)
+    via_default.setdefault("c", {"state": "a"})
+    assert _forwarded(via_default, via_default["c"], "b") == 1
+
+
+def test_tracked_dict_child_inherits_parent_settings_when_parent_empty() -> None:
+    """Children linked into an empty parent inherit its tracking settings."""
+    parent = TrackedDict(
+        tracking_auto_convert=True,
+        tracking_capture_snapshots=True,
+        tracking_record_init=False,
+    )
+    parent["c"] = {"state": "a"}
+    child = parent["c"]
+    assert child._tracking_capture_snapshots is True
+    assert child._tracking_record_init is False
+
+
+def test_tracked_dict_overwrite_and_delete_unlink_child() -> None:
+    """Overwriting or deleting a child (even an empty one) stops forwarding."""
+    parent = TrackedDict(tracking_auto_convert=True)
+    parent["c"] = {"state": "a"}
+    old = parent["c"]
+    parent["c"] = 1
+    assert _forwarded(parent, old, "b") == 0
+
+    parent["e"] = {}
+    empty = parent["e"]
+    del parent["e"]
+    assert _forwarded(parent, empty, "b") == 0
+
+
+def test_tracked_dict_reassigning_same_child_keeps_link() -> None:
+    """Re-assigning the same child object leaves it linked."""
+    parent = TrackedDict(tracking_auto_convert=True)
+    parent["c"] = {"state": "a"}
+    child = parent["c"]
+    parent["c"] = child
+    assert _forwarded(parent, child, "b") == 1
+    parent.update({"c": child})
+    assert _forwarded(parent, child, "c") == 1
+
+
+def test_tracked_dict_pop_popitem_clear_unlink_children() -> None:
+    """pop, popitem and clear still unlink children."""
+    parent = TrackedDict(tracking_auto_convert=True)
+    parent["a"] = {"state": "x"}
+    parent["b"] = {"state": "x"}
+    parent["c"] = {"state": "x"}
+    a, b, c = parent["a"], parent["b"], parent["c"]
+    parent.pop("a")
+    assert _forwarded(parent, a, "y") == 0
+    parent.popitem()
+    assert _forwarded(parent, c, "y") == 0
+    parent.clear()
+    assert _forwarded(parent, b, "y") == 0

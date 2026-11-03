@@ -59,6 +59,20 @@ def test_parent_and_child_freed_without_gc() -> None:
         gc.enable()
 
 
+def test_empty_parent_setitem_child_freed_without_gc() -> None:
+    gc.disable()
+    try:
+        parent = TrackedDict(tracking_auto_convert=True)
+        parent["child"] = {"a": 1}
+        parent_ref = weakref.ref(parent)
+        child_ref = weakref.ref(parent["child"])
+        del parent
+        assert parent_ref() is None
+        assert child_ref() is None
+    finally:
+        gc.enable()
+
+
 class _Counter:
     def __init__(self) -> None:
         self.calls = 0
