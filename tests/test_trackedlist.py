@@ -148,3 +148,31 @@ def test_tracked_list_reassigning_same_child_keeps_link() -> None:
     child = parent[1]
     parent[1] = parent[1]
     assert _forwarded(parent, child, 2) == 1
+
+
+def test_list_auto_convert_construction_records_only_init() -> None:
+    tracked = TrackedList([1, {"s": 1}], tracking_auto_convert=True)
+
+    assert [e.extra["action"] for e in tracked.tracking_changes()] == ["init"]
+    child = tracked[1]
+    assert isinstance(child, TrackedDict)
+    assert [e.extra["action"] for e in child.tracking_changes()] == ["init"]
+    assert child._tracking_uuid in tracked._tracking_child_tracked_items
+
+
+def test_list_nested_construction_still_forwards_later_mutations() -> None:
+    tracked = TrackedList([[1], {"s": 1}], tracking_auto_convert=True)
+
+    tracked[1]["z"] = 2
+
+    entries = tracked.tracking_changes()[1:]
+    assert [(e.extra["action"], e.extra["location"]) for e in entries] == [("add", "1:z")]
+
+
+def test_list_assigning_non_empty_container_adds_one_parent_entry() -> None:
+    tracked = TrackedList([0], tracking_auto_convert=True)
+
+    tracked[0] = {"s": 1}
+
+    assert [e.extra["action"] for e in tracked.tracking_changes()] == ["init", "update"]
+    assert [e.extra["action"] for e in tracked[0].tracking_changes()] == ["init"]

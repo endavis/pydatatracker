@@ -281,12 +281,13 @@ class TrackBase:
             self._tracking_capture_snapshots = kwargs["tracking_capture_snapshots"]
         if "tracking_capture_stack" in kwargs:
             self._tracking_capture_stack = kwargs["tracking_capture_stack"]
-        if tracking_parent is not None:
-            tracking_parent._tracking_add_child_tracked_item(tracking_location, self)
-
         if self._tracking_record_init:
             self.tracking_create_change(action="init", init_data=f"{self}")
         self._tracking_convert_all_values()
+        # Link after construction so the parent never sees this child's own
+        # construction entries.
+        if tracking_parent is not None:
+            tracking_parent._tracking_add_child_tracked_item(tracking_location, self)
 
     def _tracking_convert_value(self, value: Any, location: Any = "") -> Any:
         """Convert a value to a trackable type if automatic conversion is enabled.
@@ -339,8 +340,9 @@ class TrackBase:
 
         This method registers a specified child tracked item within the tracking
         structure, allowing it to be monitored for changes. It also ensures that
-        the child item inherits the lock state of the parent and adds the parent
-        as an observer to the child item.
+        the child item inherits the lock state of the parent (the child is only
+        locked or unlocked when its state differs, so a matching child records
+        nothing) and adds the parent as an observer to the child item.
 
         Args:
             location: The location of the child item within the tracking structure.
@@ -354,10 +356,11 @@ class TrackBase:
             "location": location,
             "item": trackable_item,
         }
-        if self._tracking_locked:
-            trackable_item.lock()
-        else:
-            trackable_item.unlock()
+        if self._tracking_locked != trackable_item._tracking_locked:
+            if self._tracking_locked:
+                trackable_item.lock()
+            else:
+                trackable_item.unlock()
         trackable_item.tracking_add_observer(self._tracking_notify_observers, weak=True)
 
     def _tracking_remove_child_tracked_item(self, trackable_item: "TrackBase") -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydatatracker import TrackedDict
+from pydatatracker import TrackedDict, TrackedList
 from pydatatracker.utils.changelog import ChangeLogEntry
 
 
@@ -225,3 +225,55 @@ def test_tracked_dict_pop_popitem_clear_unlink_children() -> None:
     assert _forwarded(parent, c, "y") == 0
     parent.clear()
     assert _forwarded(parent, b, "y") == 0
+
+
+def _actions(tracked: TrackedDict | TrackedList) -> list[str]:
+    return [e.extra["action"] for e in tracked.tracking_changes()]
+
+
+def test_dict_auto_convert_construction_records_only_init() -> None:
+    tracked = TrackedDict({"a": 1, "b": [1]}, tracking_auto_convert=True)
+
+    assert _actions(tracked) == ["init"]
+    child = tracked["b"]
+    assert isinstance(child, TrackedList)
+    assert _actions(child) == ["init"]
+    assert child._tracking_uuid in tracked._tracking_child_tracked_items
+
+
+def test_dict_construction_without_auto_convert_records_only_init() -> None:
+    assert _actions(TrackedDict({"a": 1, "b": [1]})) == ["init"]
+
+
+def test_dict_construction_with_record_init_false_records_nothing() -> None:
+    assert TrackedDict({"a": 1}, tracking_record_init=False).tracking_changes() == []
+
+
+def test_dict_nested_construction_still_forwards_later_mutations() -> None:
+    tracked = TrackedDict({"b": [1, {"s": 1}]}, tracking_auto_convert=True)
+
+    tracked["b"][1]["z"] = 2
+    tracked["b"].append(5)
+
+    entries = tracked.tracking_changes()[1:]
+    assert [(e.extra["action"], e.extra["location"]) for e in entries] == [
+        ("add", "b|1:z"),
+        ("add", "b|2"),
+    ]
+
+
+def test_dict_assigning_non_empty_container_adds_one_parent_entry() -> None:
+    tracked = TrackedDict(tracking_auto_convert=True)
+
+    tracked["c"] = {"s": 1}
+
+    assert _actions(tracked) == ["init", "add"]
+    assert _actions(tracked["c"]) == ["init"]
+
+
+def test_dict_child_under_locked_parent_is_locked() -> None:
+    tracked = TrackedDict({"b": {"s": [1]}}, tracking_auto_convert=True)
+    tracked.lock()
+
+    assert tracked["b"]._tracking_locked
+    assert tracked["b"]["s"]._tracking_locked
