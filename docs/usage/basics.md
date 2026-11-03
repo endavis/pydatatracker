@@ -36,6 +36,10 @@ construction entries are not forwarded to its parent. Assigning a container into
 parent records one `add` or `update` entry on the parent whose value holds the
 assigned container.
 
+In-place operators (`list += x`, `list *= n`, `dict |= x`) and slice assignment or
+deletion on a `TrackedList` are tracked and respect `lock()`. A slice change is one
+`update` entry whose location is `repr(slice)`, for example `slice(0, 2, None)`.
+
 ### Tracking actors
 
 Set a temporary actor when mutating tracked objects to avoid stack inspection overhead:

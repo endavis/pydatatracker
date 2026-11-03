@@ -42,7 +42,7 @@ Classes:
 
 # Standard Library
 from collections.abc import Hashable
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any, Self
 
 # 3rd Party
 # Project
@@ -516,29 +516,28 @@ class TrackedDict(TrackBase, dict):
                     self[key]._tracking_known_uuids_tree(level + 1, emptybar=emptybar)
                 )
 
-    # Intentionally unsupported; dict's __or__/__ior__ pairing cannot be satisfied by a raiser.
     def __ior__(  # type: ignore[misc]  # pyright: ignore[reportIncompatibleMethodOverride]
         self, other: Any
-    ) -> NoReturn:
-        """In-place OR operation (|=) override for TrackedDict.
+    ) -> Self:
+        """In-place OR operation (``|=``) override for TrackedDict.
 
-        This method is intentionally not implemented as the |= operator is not supported
-        for TrackedDict objects to maintain tracking integrity.
+        Delegates to :meth:`update`, so it records one ``update`` change, converts and
+        links new children, unlinks replaced ones, and raises ``RuntimeError`` when
+        locked.
 
         Args:
-            other: The object to perform the OR operation with.
+            other: A mapping or an iterable of key/value pairs.
 
-        Raises:
-            NotImplementedError: Always raises this exception as the operation is not
-                supported.
+        Returns:
+            This dictionary.
 
         Example:
             >>> tracked_dict = TrackedDict({'a': 1})
-            >>> tracked_dict |= {'b': 2}  # Raises NotImplementedError
+            >>> tracked_dict |= {'b': 2}  # Tracked as an update
 
         """
-        del other  # unused; the operation is unsupported
-        raise NotImplementedError("The |= operator is not supported for TrackedDict")
+        self.update(other)
+        return self
 
     def _tracking_format_tree_location(self, location: str | int | None = None) -> dict:
         """Format the tree location for tracking purposes.

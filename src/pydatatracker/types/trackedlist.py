@@ -38,8 +38,9 @@ Classes:
 """
 
 # Standard Library
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+import operator
+from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING, Any, Self, SupportsIndex
 
 # 3rd Party
 # Project
@@ -167,23 +168,29 @@ class TrackedList(TrackBase, list):
 
     @check_lock
     @track_changes
-    def __setitem__(self, index: int, item: Any) -> None:
-        """Set an item in the tracked list.
+    def __setitem__(self, index: int | slice, item: Any) -> None:
+        """Set an item or a slice in the tracked list.
 
-        This method sets an item at the specified index in the tracked list,
-        converting the item to a tracked value if necessary. It also updates
-        the tracking context with the action details.
+        An int index sets one item, converting it to a tracked value if necessary.
+        A slice assigns an iterable, converting each new value, and is recorded as a
+        single ``update`` whose location is ``repr(index)`` (for example
+        ``"slice(0, 2, None)"``); old items no longer in the list are unlinked.
 
         Args:
-            index: The index at which to set the item.
-            item: The item to set in the list.
+            index: The index or slice at which to set the item(s).
+            item: The item to set, or an iterable of items for a slice.
 
         Raises:
-            TypeError: If the index is not an integer.
+            TypeError: If the index is neither an integer nor a slice.
+            ValueError: If an extended slice is assigned a sequence of the wrong size.
 
         """
+        if isinstance(index, slice):
+            self._tracking_set_slice(index, item)
+            return
+
         if not isinstance(index, int):
-            raise TypeError(f"Tracked list index must be an int, not {type(index)}")
+            raise TypeError(f"Tracked list index must be an int or slice, not {type(index)}")
 
         try:
             old_item = self[index]
@@ -200,28 +207,75 @@ class TrackedList(TrackBase, list):
         self._tracking_context["value"] = item
         self._tracking_context["location"] = index
 
-    @check_lock
-    @track_changes
-    def __delitem__(self, index: int) -> None:
-        """Delete an item from the tracked list.
+    def _tracking_set_slice(self, index: slice, items: Iterable) -> None:
+        """Assign ``items`` to a slice and fill the tracking context.
 
-        This method deletes an item at the specified index from the tracked list,
-        updating the tracking context with the action details.
+        The values are snapshotted first, so ``tl[:] = tl`` and generators are safe.
+        An extended-slice size mismatch raises before anything is converted or linked.
 
         Args:
-            index: The index of the item to delete.
+            index: The slice being assigned.
+            items: The iterable of new values.
 
         Raises:
-            TypeError: If the index is not an integer.
+            ValueError: If an extended slice is assigned a sequence of the wrong size.
+
+        """
+        values = list(items)
+        old_items = list(list.__getitem__(self, index))
+        start, _stop, step = index.indices(len(self))
+        if step != 1 and len(old_items) != len(values):
+            raise ValueError(
+                f"attempt to assign sequence of size {len(values)} "
+                f"to extended slice of size {len(old_items)}"
+            )
+
+        converted = [
+            self._tracking_convert_value(value, start + position * step)
+            for position, value in enumerate(values)
+        ]
+        list.__setitem__(self, index, converted)
+
+        removed = [old for old in old_items if not any(old is new for new in converted)]
+        if removed:
+            self._tracking_context.setdefault("removed_items", []).extend(removed)
+        self._tracking_context["action"] = "update"
+        self._tracking_context["value"] = converted
+        self._tracking_context["location"] = repr(index)
+
+    @check_lock
+    @track_changes
+    def __delitem__(self, index: int | slice) -> None:
+        """Delete an item or a slice from the tracked list.
+
+        An int index deletes one item. A slice deletes every item it covers and is
+        recorded as a single ``update`` whose location is ``repr(index)``; the removed
+        items are unlinked.
+
+        Args:
+            index: The index or slice to delete.
+
+        Raises:
+            TypeError: If the index is neither an integer nor a slice.
 
         Example:
             >>> tracked_list = TrackedList([1, 2, 3])
             >>> del tracked_list[1]  # Deletion is tracked
+            >>> del tracked_list[0:2]  # Slice deletion is tracked
             >>> del tracked_list[5]  # Raises IndexError
 
         """
+        if isinstance(index, slice):
+            old_items = list(list.__getitem__(self, index))
+            super().__delitem__(index)
+            self._tracking_context.setdefault("removed_items", []).extend(old_items)
+            self._tracking_context["action"] = "update"
+            self._tracking_context["value"] = old_items
+            self._tracking_context["location"] = repr(index)
+            return
+
         if not isinstance(index, int):
-            raise TypeError(f"Tracked list index must be an int, not {type(index)}")
+            raise TypeError(f"Tracked list index must be an int or slice, not {type(index)}")
 
         old_item = self[index]
         if not self._tracking_locked:
@@ -293,12 +347,64 @@ class TrackedList(TrackBase, list):
         extend_length = len(new_data)
         current_leng = len(self)
 
-        locations = [str(i - 1) for i in range(current_leng - 1, current_leng - 1 + extend_length)]
+        locations = [str(i) for i in range(current_leng - extend_length, current_leng)]
         location = ",".join(locations)
 
         self._tracking_context["action"] = "add"
         self._tracking_context["value"] = items
         self._tracking_context["location"] = location
+
+    def __iadd__(self, other: Iterable) -> Self:  # type: ignore[misc]
+        """Extend the list in place (``+=``) through :meth:`extend`.
+
+        Records one ``extend`` change, converts and links new items, and honours the
+        lock.
+
+        Args:
+            other: The iterable of items to append.
+
+        Returns:
+            This list.
+
+        """
+        self.extend(list(other))
+        return self
+
+    @check_lock
+    @track_changes
+    def __imul__(self, n: SupportsIndex) -> Self:
+        """Repeat the list in place (``*=``) and track the change.
+
+        ``n >= 1`` records an ``add`` for the new indexes (with ``multiplier``);
+        ``n <= 0`` empties the list and records a ``remove`` that unlinks children.
+        Repeated children stay a single child entry.
+
+        Args:
+            n: The repeat count.
+
+        Returns:
+            This list.
+
+        Raises:
+            TypeError: If ``n`` is not an integer (nothing is mutated).
+
+        """
+        count = operator.index(n)
+        old_items = list(list.__iter__(self))
+        if count <= 0:
+            list.clear(self)
+            self._tracking_context["action"] = "remove"
+            self._tracking_context["removed_items"] = old_items
+            self._tracking_context["value"] = old_items
+        else:
+            list.__imul__(self, count)
+            self._tracking_context["action"] = "add"
+            self._tracking_context["value"] = list(list.__iter__(self))[len(old_items) :]
+            self._tracking_context["location"] = ",".join(
+                str(i) for i in range(len(old_items), len(self))
+            )
+        self._tracking_context["multiplier"] = count
+        return self
 
     @check_lock
     @track_changes
