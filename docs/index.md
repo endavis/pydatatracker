@@ -65,6 +65,7 @@ print(collector.as_list()[-1].to_dict())
 - **[Installation](getting-started/installation.md)** - How to install the package
 - **[Usage Guide](usage/basics.md)** - How to use the package
 - **[Debugging & Observability](usage/debugging.md)** - Actors, snapshots, stack capture and observers
+- **[Performance](usage/performance.md)** - Measured overhead against the standard library
 - **[API Reference](reference/api.md)** - Complete API documentation
 
 ### For Contributors
