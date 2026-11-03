@@ -228,6 +228,9 @@ class TrackedList(TrackBase, list):
         except IndexError:
             raise IndexError("list assignment index out of range") from None
 
+        if index < 0:
+            index += len(self)
+
         item = self._tracking_store_item(item, index)
         if not self._tracking_locked:
             super().__setitem__(index, item)
@@ -310,6 +313,8 @@ class TrackedList(TrackBase, list):
             raise TypeError(f"Tracked list index must be an int or slice, not {type(index)}")
 
         old_item = self[index]
+        if index < 0:
+            index += len(self)
         if not self._tracking_locked:
             super().__delitem__(index)
             self._tracking_reindex_child_locations()
@@ -460,14 +465,16 @@ class TrackedList(TrackBase, list):
             >>> tracked_list.insert(5, 'a')  # Insert is tracked
 
         """
+        length = len(self)
+        clamped = max(index + length, 0) if index < 0 else min(index, length)
         if not self._tracking_locked:
-            item = self._tracking_store_item(item, index)
-            super().insert(index, item)
+            item = self._tracking_store_item(item, clamped)
+            super().insert(clamped, item)
             self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "add"
         self._tracking_context["value"] = item
-        self._tracking_context["location"] = index
+        self._tracking_context["location"] = clamped
 
     @check_lock
     @track_changes
@@ -534,7 +541,7 @@ class TrackedList(TrackBase, list):
 
         """
         passed_index = index
-        actual_index = len(self) - 1 if passed_index == -1 else index
+        actual_index = index + len(self) if index < 0 else index
         item = "###^$^@$^$default###^$^@$^"
         if not self._tracking_locked:
             item = super().pop(index)

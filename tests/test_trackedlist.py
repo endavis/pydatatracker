@@ -649,3 +649,117 @@ def test_tracked_list_insert_front_reindexes_children() -> None:
 
     locations = sorted(c["location"] for c in tracked._tracking_child_tracked_items.values())
     assert locations == [1, 2]
+
+
+def _stored_locations(tracked: TrackedList) -> list[object]:
+    return sorted(c["location"] for c in tracked._tracking_child_tracked_items.values())
+
+
+def test_setitem_negative_index_stores_non_negative_child_location() -> None:
+    """l[-1] = {...} links the child at its real index and forwards that location."""
+    tracked = TrackedList([{"a": 1}, {"b": 2}, {"c": 3}], tracking_auto_convert=True)
+
+    tracked[-1] = {"z": 1}
+    assert _latest_change(tracked).extra["location"] == 2
+    assert 2 in _stored_locations(tracked)
+    assert -1 not in _stored_locations(tracked)
+
+    tracked[2]["z"] = 2
+    assert _latest_change(tracked).extra["location"] == "2:z"
+
+
+def test_setitem_negative_index_issue_repro() -> None:
+    """The issue's repro: a two-item list assigned at -1 forwards '1:z'."""
+    tracked = TrackedList([{"a": 1}, {"b": 2}], tracking_auto_convert=True)
+
+    tracked[-1] = {"z": 1}
+    tracked[1]["z"] = 2
+
+    assert _latest_change(tracked).extra["location"] == "1:z"
+    assert list(tracked)[1] == {"z": 2}
+
+
+def test_delitem_negative_index_logs_non_negative_location() -> None:
+    tracked = TrackedList([1, 2, 3])
+
+    del tracked[-2]
+
+    assert list(tracked) == [1, 3]
+    assert _latest_change(tracked).extra["location"] == 1
+
+
+def test_pop_negative_index_logs_actual_location() -> None:
+    tracked = TrackedList(["a", "b", "c"])
+
+    assert tracked.pop(-2) == "b"
+
+    change = _latest_change(tracked)
+    assert change.extra["location"] == 1
+    assert change.extra["passed_index"] == "-2"
+
+
+def test_pop_negative_index_reaching_front_logs_zero() -> None:
+    tracked = TrackedList(["a", "b", "c"])
+
+    assert tracked.pop(-3) == "a"
+
+    assert _latest_change(tracked).extra["location"] == 0
+
+
+def test_pop_default_and_last_unchanged() -> None:
+    tracked = TrackedList(["a", "b", "c"])
+
+    assert tracked.pop() == "c"
+    assert _latest_change(tracked).extra["location"] == 2
+    assert tracked.pop(-1) == "b"
+    change = _latest_change(tracked)
+    assert change.extra["location"] == 1
+    assert change.extra["passed_index"] == "-1"
+
+
+@pytest.mark.parametrize(
+    ("index", "expected_location", "expected"),
+    [
+        (-1, 2, [1, 2, 9, 3]),
+        (-100, 0, [9, 1, 2, 3]),
+        (99, 3, [1, 2, 3, 9]),
+        (3, 3, [1, 2, 3, 9]),
+        (0, 0, [9, 1, 2, 3]),
+    ],
+)
+def test_insert_logs_clamped_location(
+    index: int, expected_location: int, expected: list[int]
+) -> None:
+    tracked = TrackedList([1, 2, 3])
+    reference = [1, 2, 3]
+
+    tracked.insert(index, 9)
+    reference.insert(index, 9)
+
+    assert list(tracked) == reference == expected
+    assert _latest_change(tracked).extra["location"] == expected_location
+    assert tracked[expected_location] == 9
+
+
+@pytest.mark.parametrize(("index", "expected_location"), [(-1, 1), (-100, 0), (99, 2)])
+def test_insert_child_location_matches_resulting_index(index: int, expected_location: int) -> None:
+    tracked = TrackedList([1, 2], tracking_auto_convert=True)
+
+    tracked.insert(index, {"k": 1})
+
+    assert _stored_locations(tracked) == [expected_location]
+    tracked[expected_location]["k"] = 2
+    assert _latest_change(tracked).extra["location"] == f"{expected_location}:k"
+
+
+@pytest.mark.parametrize("index", [-4, 3, 99, -100])
+def test_negative_and_large_index_out_of_range_still_raises(index: int) -> None:
+    tracked = TrackedList([1, 2, 3])
+
+    with pytest.raises(IndexError):
+        tracked[index] = 0
+    with pytest.raises(IndexError):
+        del tracked[index]
+    with pytest.raises(IndexError):
+        tracked.pop(index)
+    assert list(tracked) == [1, 2, 3]
