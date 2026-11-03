@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793708190133,
+  "lastUpdate": 1793708642593,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -1304,6 +1304,107 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000015966665602590501",
             "extra": "mean: 12.805061392600344 usec\nrounds: 81948"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a91fa82ad1549579612bd17a6e23694a3816d2ed",
+          "message": "fix: update child locations in sort and reverse without raising (merges PR #42, addresses #38)\n\n* fix: update child locations in sort and reverse without raising\n\nTrackedList.sort() and reverse() looked up each child by its uuid key with\nlist.index, raising ValueError after the list had been reordered and\nrecording no change entry. They also wrote the key \"index\" instead of\n\"location\". Refresh each child's stored location by identity through a\nsmall private helper, so one update entry is recorded.\n\nAddresses #38\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\n* refactor: reuse the #37 re-index helper in sort and reverse\n\nAfter rebasing on #37, TrackedList had two private helpers that reset\nchild locations by identity. sort() and reverse() now call\n_tracking_reindex_child_locations, and _tracking_refresh_child_locations\nis removed. The reverse test asserts the exact forwarded location (\"1:a\")\ninstead of a prefix.\n\nAddresses #38\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-03T12:22:58Z",
+          "tree_id": "d76df5bf175a76eb4d4a21ac0c986544747f5538",
+          "url": "https://github.com/endavis/pydatatracker/commit/a91fa82ad1549579612bd17a6e23694a3816d2ed"
+        },
+        "date": 1793708641770,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 612.8881245205556,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000019024465100666567",
+            "extra": "mean: 1.6316191487349678 msec\nrounds: 632"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 217.7115785036339,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003926315180252738",
+            "extra": "mean: 4.5932329684675395 msec\nrounds: 222"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 616.3677423817633,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000019255012519842267",
+            "extra": "mean: 1.6224080710904956 msec\nrounds: 633"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 627.8625168588436,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000183318547526916",
+            "extra": "mean: 1.5927053664597415 msec\nrounds: 644"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_capped",
+            "value": 614.7648007191248,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001836386741028927",
+            "extra": "mean: 1.6266383482434976 msec\nrounds: 626"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[100]",
+            "value": 111843.47878112335,
+            "unit": "iter/sec",
+            "range": "stddev: 7.477294831694464e-7",
+            "extra": "mean: 8.941066666542003 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[1000]",
+            "value": 65688.49204265336,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018945702021080396",
+            "extra": "mean: 15.223366664448198 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[10000]",
+            "value": 27510.593869596916,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000087883613962446",
+            "extra": "mean: 36.34963333543813 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_monitored",
+            "value": 75309.70687462494,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001477960154950219",
+            "extra": "mean: 13.278500760397232 usec\nrounds: 84168"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_update",
+            "value": 2853351.961143619,
+            "unit": "iter/sec",
+            "range": "stddev: 6.548465491599678e-8",
+            "extra": "mean: 350.46500173052664 nsec\nrounds: 200"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_declared",
+            "value": 127294.87202979454,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010360388193453843",
+            "extra": "mean: 7.855775995170809 usec\nrounds: 141363"
           }
         ]
       }
