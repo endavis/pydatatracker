@@ -115,6 +115,39 @@ fields do not record the `init` entry by default. Pass `tracking_record_init=Tru
 their parent. `tracking_add_attribute_to_monitor` still records `start monitoring` for
 dynamic attributes.
 
+### Converting items on insert
+
+`TrackedList` and `TrackedDict` call `_tracking_convert_item(value, location)` for every value
+they store: construction, `append`, `insert`, `extend`, `+=`, item and slice assignment,
+`update`, `|=` and `setdefault` (only when the key is missing). `*=` does not call it, since it
+only repeats existing items. The hook runs whatever `tracking_auto_convert` is set to. Override it
+to wrap values or to reject them:
+
+```python
+from typing import Any
+
+from pydatatracker import TrackedDict, TrackedList
+
+
+class RecordList(TrackedList):
+    def _tracking_convert_item(self, value: Any, location: Any = "") -> Any:
+        if isinstance(value, bytes):
+            raise TypeError("bytes are not allowed")
+        if isinstance(value, str):
+            return TrackedDict({"text": value})
+        return super()._tracking_convert_item(value, location)
+
+
+records = RecordList()
+records.append("hello")  # stored as TrackedDict({"text": "hello"})
+```
+
+A new tracked result is linked as a child, so its changes are forwarded to the container. A value
+that is already tracked and returned unchanged is not linked, as before. If the hook raises, the
+insert is rejected and the container (contents, change log and child links) is left unchanged,
+including for batch inserts such as `extend` and `update`. Construction calls the hook inside
+`TrackBase.__init__`, so set any state the hook needs before calling `super().__init__()`.
+
 ### Observers
 
 Register observers to receive every `ChangeLogEntry` as it happens. The bundled
