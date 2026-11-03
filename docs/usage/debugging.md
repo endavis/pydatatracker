@@ -103,6 +103,9 @@ Run `just benchmark` to quantify how actors, snapshots, and stack capture affect
 
 ## Async observers
 Use `async_queue_observer` to forward change dictionaries into an `asyncio.Queue` while continuing to operate in synchronous contexts.
+The observer needs a running event loop when the queue's `put` is a coroutine function; without
+one it raises a `RuntimeError` before creating any coroutine, after the mutation is committed.
+Mutate from inside the loop, or use a plain `queue.Queue`.
 
 ## CLI utilities
 Use `scripts/cli.py` (or `just cli`) to emit serialized changes from a demo session or show JSONL logs via `show`.
