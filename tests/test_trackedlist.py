@@ -403,3 +403,75 @@ def test_slice_location_under_dict_parent() -> None:
     parent["b"][0:1] = [9]
 
     assert parent.tracking_changes()[-1].extra["location"] == "b|slice(0, 1, None)"
+
+
+def _two_children() -> TrackedList:
+    return TrackedList([{"a": 1}, {"b": 2}], tracking_auto_convert=True)
+
+
+def _assert_child_location(tracked: TrackedList, index: int, key: str) -> None:
+    tracked[index][key] = 99
+    change = _latest_change(tracked)
+    assert change.extra["action"] == "update"
+    assert change.extra["location"] == f"{index}:{key}"
+
+
+def test_insert_shifts_child_locations() -> None:
+    tracked = _two_children()
+    tracked.insert(0, 5)
+    _assert_child_location(tracked, 2, "b")
+    _assert_child_location(tracked, 1, "a")
+
+
+def test_insert_negative_index_shifts_child_locations() -> None:
+    tracked = _two_children()
+    tracked.insert(-1, 5)
+    _assert_child_location(tracked, 2, "b")
+    _assert_child_location(tracked, 0, "a")
+
+
+def test_pop_shifts_child_locations() -> None:
+    tracked = TrackedList([1, {"a": 1}, {"b": 2}], tracking_auto_convert=True)
+    tracked.pop(0)
+    _assert_child_location(tracked, 0, "a")
+    _assert_child_location(tracked, 1, "b")
+
+
+def test_remove_shifts_child_locations() -> None:
+    tracked = TrackedList([1, {"a": 1}, {"b": 2}], tracking_auto_convert=True)
+    tracked.remove(1)
+    _assert_child_location(tracked, 0, "a")
+    _assert_child_location(tracked, 1, "b")
+
+
+def test_del_int_shifts_child_locations() -> None:
+    tracked = TrackedList([1, {"a": 1}, {"b": 2}], tracking_auto_convert=True)
+    del tracked[0]
+    _assert_child_location(tracked, 0, "a")
+    _assert_child_location(tracked, 1, "b")
+
+
+def test_del_slice_shifts_child_locations() -> None:
+    tracked = TrackedList([1, 2, {"a": 1}, {"b": 2}], tracking_auto_convert=True)
+    removed = tracked[0]
+    del tracked[0:2]
+    _assert_child_location(tracked, 0, "a")
+    _assert_child_location(tracked, 1, "b")
+    assert removed == 1
+
+
+def test_slice_assignment_changing_length_shifts_child_locations() -> None:
+    tracked = TrackedList([1, 2, {"a": 1}, {"b": 2}], tracking_auto_convert=True)
+    tracked[0:2] = [7, 8, 9, 10, 11]
+    _assert_child_location(tracked, 5, "a")
+    _assert_child_location(tracked, 6, "b")
+    tracked[0:5] = [0]
+    _assert_child_location(tracked, 1, "a")
+    _assert_child_location(tracked, 2, "b")
+
+
+def test_reindex_does_not_resurrect_removed_child() -> None:
+    tracked = _two_children()
+    removed = tracked.pop(0)
+    assert removed._tracking_uuid not in tracked._tracking_child_tracked_items
+    assert len(tracked._tracking_child_tracked_items) == 1
