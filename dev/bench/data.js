@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793715201185,
+  "lastUpdate": 1793717355457,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -1910,6 +1910,149 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000001732243531393621",
             "extra": "mean: 12.734217770727344 usec\nrounds: 81820"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0db0e9eb9c7fb10cae5ed451ddb143cdceba7642",
+          "message": "refactor: skip the TrackedList child reindex when no children are linked (merges PR #74, addresses #64)\n\n_tracking_reindex_child_locations scanned the whole list on every shifting\nmutation even when no child was linked. It now returns early when\n_tracking_child_tracked_items is empty. Behavior with children is unchanged.\n\nAdds insert(0)/pop(0) benchmarks (no children, 1k/10k/20k items) and tests\nthat the scan is skipped without children and locations stay correct with them.\n\ndoit benchmark_compare vs saved baseline (mean ns, before -> after):\ninsert(0) 1k: 37,995 -> 8,872; 10k: 341,423 -> 15,315; 20k: 655,271 -> 26,644\npop(0)    1k: 40,648 -> 11,058; 10k: 330,093 -> 15,562; 20k: 655,523 -> 22,483\n\nAddresses #64\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sdzAvfEq6Sfm5kBX5t\n\nCo-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-03T14:48:06Z",
+          "tree_id": "ad93c50d6cd9184524a26edcdf04e2770e21ab4d",
+          "url": "https://github.com/endavis/pydatatracker/commit/0db0e9eb9c7fb10cae5ed451ddb143cdceba7642"
+        },
+        "date": 1793717354819,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 805.3244547416803,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015325325469280877",
+            "extra": "mean: 1.2417355441177615 msec\nrounds: 816"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 261.70871334587474,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0001662410655762585",
+            "extra": "mean: 3.821042055555858 msec\nrounds: 270"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 808.2451117625274,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003353204109740079",
+            "extra": "mean: 1.2372484354644793 msec\nrounds: 829"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 838.3680350317127,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000021168654727414175",
+            "extra": "mean: 1.192793568235427 msec\nrounds: 850"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_capped",
+            "value": 824.6832538361451,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000205519136156362",
+            "extra": "mean: 1.2125867663109942 msec\nrounds: 843"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[100]",
+            "value": 155795.5961473572,
+            "unit": "iter/sec",
+            "range": "stddev: 2.7963391489865763e-7",
+            "extra": "mean: 6.418666667921494 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[1000]",
+            "value": 110320.07531585773,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000011949742663647074",
+            "extra": "mean: 9.064533333003055 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[10000]",
+            "value": 36709.73126020397,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008242734743742246",
+            "extra": "mean: 27.240733333400158 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[1000]",
+            "value": 133494.71361827297,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000023554457805039367",
+            "extra": "mean: 7.490933332832128 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[10000]",
+            "value": 92277.31177278655,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000002006214626427058",
+            "extra": "mean: 10.836900000536314 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[20000]",
+            "value": 76972.2207255085,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000033080025239634753",
+            "extra": "mean: 12.991700000005343 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[1000]",
+            "value": 102531.85323121648,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007490322391432157",
+            "extra": "mean: 9.753066666462473 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[10000]",
+            "value": 82889.64349486346,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000027158749868177656",
+            "extra": "mean: 12.06423333286466 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[20000]",
+            "value": 77914.79238216142,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000020197104733690515",
+            "extra": "mean: 12.834533333479687 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_monitored",
+            "value": 90303.10345840217,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014192994395499589",
+            "extra": "mean: 11.07381653234816 usec\nrounds: 96284"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_update",
+            "value": 3312903.7613198822,
+            "unit": "iter/sec",
+            "range": "stddev: 3.23661138874679e-8",
+            "extra": "mean: 301.8499998930224 nsec\nrounds: 200"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_declared",
+            "value": 144067.91391078758,
+            "unit": "iter/sec",
+            "range": "stddev: 6.553979462283893e-7",
+            "extra": "mean: 6.9411708190571755 usec\nrounds: 153847"
           }
         ]
       }
