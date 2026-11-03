@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections import deque
 
+import pytest
+
 from pydatatracker import TrackedDict, TrackedList
 from pydatatracker.utils.changelog import ChangeLogEntry
 
@@ -312,3 +314,46 @@ def test_dict_child_under_locked_parent_is_locked() -> None:
 
     assert tracked["b"]._tracking_locked
     assert tracked["b"]["s"]._tracking_locked
+
+
+def test_dict_ior_records_one_update_and_returns_self() -> None:
+    tracked = TrackedDict({"a": 1})
+    same = tracked
+    before = len(tracked.tracking_changes())
+
+    tracked |= {"b": 2}
+
+    assert tracked is same
+    assert dict(tracked) == {"a": 1, "b": 2}
+    assert len(tracked.tracking_changes()) == before + 1
+    assert _latest_change(tracked).extra["action"] == "update"
+
+
+def test_dict_ior_accepts_pairs_and_links_children() -> None:
+    tracked = TrackedDict(tracking_auto_convert=True)
+
+    tracked |= [("c", {"s": 1})]
+
+    assert isinstance(tracked["c"], TrackedDict)
+    assert _forwarded(tracked, tracked["c"], "b") == 1
+
+
+def test_dict_ior_unlinks_replaced_child() -> None:
+    tracked = TrackedDict({"c": {"s": 1}}, tracking_auto_convert=True)
+    old = tracked["c"]
+
+    tracked |= {"c": 5}
+
+    assert _forwarded(tracked, old, "b") == 0
+
+
+def test_dict_ior_locked_raises_without_mutation() -> None:
+    tracked = TrackedDict({"a": 1})
+    tracked.lock()
+    before = len(tracked.tracking_changes())
+
+    with pytest.raises(RuntimeError):
+        tracked |= {"b": 2}
+
+    assert dict(tracked) == {"a": 1}
+    assert len(tracked.tracking_changes()) == before
