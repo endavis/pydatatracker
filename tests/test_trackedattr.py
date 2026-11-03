@@ -6,7 +6,7 @@ from typing import ClassVar
 
 import pytest
 
-from pydatatracker import TrackedAttr, TrackedDict
+from pydatatracker import TrackedAttr, TrackedDict, TrackedList
 from pydatatracker.utils.changelog import ChangeLogEntry
 
 
@@ -205,6 +205,70 @@ def test_empty_declared_dict_field_has_no_parent_entries_and_tracks_items() -> N
 
     change = _latest_change(obj)
     assert change.extra["location"] == "data:k"
+
+
+class DeclaredNonEmpty(TrackedAttr):
+    """Assigns a non-empty dict or list to a declared field after init."""
+
+    _tracking_fields = ("child",)
+
+    def __init__(self, value: dict[str, int] | list[int]) -> None:
+        super().__init__(tracking_auto_convert=True)
+        self.child = value
+
+
+class DeclaredEarlyDict(TrackedAttr):
+    """Assigns a non-empty dict to a declared field before super().__init__()."""
+
+    _tracking_fields = ("child",)
+
+    def __init__(self) -> None:
+        self.child = {"s": 1}
+        super().__init__(tracking_auto_convert=True)
+
+
+def test_declared_field_first_non_empty_dict_does_not_crash_and_is_linked() -> None:
+    obj = DeclaredNonEmpty({"s": 1})
+
+    assert isinstance(obj.child, TrackedDict)
+    assert obj.child["s"] == 1
+    obj.child["s"] = 2
+    change = _latest_change(obj)
+    assert change.extra["location"] == "child:s"
+    assert change.extra["value"] == "2"
+
+
+def test_declared_field_first_non_empty_dict_records_no_entry_for_the_field() -> None:
+    obj = DeclaredNonEmpty({"s": 1})
+
+    # The first assignment of a declared field records nothing for the field
+    # itself. The child's own construction entries may still be forwarded;
+    # how they appear in the parent log is #24 / #31, not asserted here.
+    assert isinstance(obj.child, TrackedDict)
+    assert not [e for e in obj.tracking_changes() if e.extra.get("location") == "child"]
+
+
+def test_declared_field_first_non_empty_list_does_not_crash_and_is_linked() -> None:
+    obj = DeclaredNonEmpty([1, 2])
+
+    assert isinstance(obj.child, TrackedList)
+    obj.child.append(3)
+    assert _latest_change(obj).extra["location"].startswith("child")
+
+
+def test_declared_field_non_empty_dict_adopted_at_end_of_init() -> None:
+    obj = DeclaredEarlyDict()
+
+    assert isinstance(obj.child, TrackedDict)
+    obj.child["s"] = 2
+    assert _latest_change(obj).extra["location"] == "child:s"
+
+
+def test_declared_field_empty_dict_still_has_no_entries() -> None:
+    obj = DeclaredNonEmpty({})
+
+    assert isinstance(obj.child, TrackedDict)
+    assert obj.tracking_changes() == []
 
 
 def test_declared_class_children_inherit_snapshots_stack_and_record_init() -> None:
