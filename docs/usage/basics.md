@@ -30,6 +30,12 @@ print(len(payload.tracking_changes()))
 `TrackedDict`, `TrackedList` and `TrackedAttr` can be nested; changes to children are
 reported through the parent, including children assigned after construction.
 
+Constructing a container records a single `init` entry. Converting the initial items,
+with or without `tracking_auto_convert`, adds no per-item entries, and a child's own
+construction entries are not forwarded to its parent. Assigning a container into a
+parent records one `add` or `update` entry on the parent whose value holds the
+assigned container.
+
 ### Tracking actors
 
 Set a temporary actor when mutating tracked objects to avoid stack inspection overhead:

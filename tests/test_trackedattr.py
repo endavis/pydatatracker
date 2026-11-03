@@ -304,3 +304,23 @@ def test_default_tracked_attr_still_records_init() -> None:
     obj = TrackedAttr()
 
     assert [c.extra["action"] for c in obj.tracking_changes()] == ["init"]
+
+
+class DeclaredNested(TrackedAttr):
+    _tracking_fields = ("child",)
+
+    def __init__(self, value: object) -> None:
+        super().__init__(tracking_auto_convert=True)
+        self.child = value
+
+
+def test_declared_field_nested_containers_record_nothing_anywhere() -> None:
+    obj = DeclaredNested({"s": [1]})
+
+    child = obj.child
+    assert isinstance(child, TrackedDict)
+    grandchild = child["s"]
+    assert isinstance(grandchild, TrackedList)
+    assert obj.tracking_changes() == []
+    assert child.tracking_changes() == []
+    assert grandchild.tracking_changes() == []

@@ -119,9 +119,12 @@ class TrackedDict(TrackBase, dict):
         to a tracked object if it is not already one. This ensures that all values in
         the dictionary are trackable and can be monitored for changes.
 
+        Values are stored through ``dict.__setitem__`` so construction records no
+        per-item change entries; only the container's own ``init`` entry is logged.
+
         """
-        for key, value in self.items():
-            self[key] = self._tracking_convert_value(value, key)
+        for key, value in list(dict.items(self)):
+            dict.__setitem__(self, key, self._tracking_convert_value(value, key))
 
     def _tracking_notify_observers(self, change_log_entry: "ChangeLogEntry") -> None:
         """Notify observers of a change in the tracked dictionary.

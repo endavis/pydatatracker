@@ -106,15 +106,18 @@ class TrackedList(TrackBase, list):
         )
 
     def _tracking_convert_all_values(self) -> None:
-        """Convert all values in the dictionary to tracked objects.
+        """Convert all values in the list to tracked objects.
 
-        Iterates through all key-value pairs in the dictionary and converts each value
-        to a tracked object if it is not already one. This ensures that all values in
-        the dictionary are trackable and can be monitored for changes.
+        Iterates through all items in the list and converts each value to a tracked
+        object if it is not already one. This ensures that all values in the list are
+        trackable and can be monitored for changes.
+
+        Values are stored through ``list.__setitem__`` so construction records no
+        per-item change entries; only the container's own ``init`` entry is logged.
 
         """
-        for index, value in enumerate(self):
-            self[index] = self._tracking_convert_value(value, index)
+        for index, value in enumerate(list(list.__iter__(self))):
+            list.__setitem__(self, index, self._tracking_convert_value(value, index))
 
     def _tracking_notify_observers(self, change_log_entry: "ChangeLogEntry") -> None:
         """Notify observers of a change in the tracked dictionary.
