@@ -50,6 +50,8 @@ from ..types._trackbase import TrackBase, track_changes
 if TYPE_CHECKING:
     from ..utils.changelog import ChangeLogEntry
 
+_NOT_SET = object()
+
 
 class TrackedAttr(TrackBase):
     """Class for tracking and managing changes to attributes.
@@ -323,6 +325,9 @@ class TrackedAttr(TrackBase):
         method that triggered the change and the state of the attribute before and
         after the change.
 
+        The same object or same-type values whose equality returns True are unchanged.
+        A type change, non-boolean equality or failed comparison records an update.
+
         Args:
             method: The name of the method that triggered the attribute change.
             attribute_name: The name of the attribute that has changed.
@@ -333,22 +338,29 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        if original_value == "#!NotSet":
+        if original_value is _NOT_SET:
             with contextlib.suppress(Exception):
                 self._tracking_original_values[attribute_name] = new_value
-        if original_value not in ["#!NotSet", new_value]:
-            extra = {
-                "data_pre_change": original_value,
-                "data_post_change": getattr(self, attribute_name),
-            }
-            self.tracking_create_change(
-                action="update",
-                method=method,
-                location=f"{attribute_name}",
-                value=new_value,
-                attribute_locked=self._tracking_is_locked_attribute(attribute_name),
-                **extra,
-            )
+            return
+        if original_value is new_value:
+            return
+        if type(original_value) is type(new_value):
+            with contextlib.suppress(Exception):
+                equal = original_value == new_value
+                if isinstance(equal, bool) and equal:
+                    return
+        extra = {
+            "data_pre_change": original_value,
+            "data_post_change": getattr(self, attribute_name),
+        }
+        self.tracking_create_change(
+            action="update",
+            method=method,
+            location=f"{attribute_name}",
+            value=new_value,
+            attribute_locked=self._tracking_is_locked_attribute(attribute_name),
+            **extra,
+        )
 
     def _tracking_convert_all_values(self) -> None:
         """Convert all tracked attribute values to their appropriate types.
@@ -549,15 +561,13 @@ class TrackedAttr(TrackBase):
                 self._tracking_pending_monitor.discard(attribute_name)
                 self._tracking_start_monitoring(attribute_name, value)
                 return
-            original_value = "#!NotSet"
+            original_value = _NOT_SET
 
         is_tracking = self._tracking_is_tracking_attribute(attribute_name)
         if is_tracking:
             value = self._tracking_convert_value(value, attribute_name)
         super().__setattr__(attribute_name, value)
-        if original_value is not value and not (
-            isinstance(original_value, str) and original_value == "#!NotSet"
-        ):
+        if original_value is not value and original_value is not _NOT_SET:
             self._tracking_release_child(original_value)
 
         if is_tracking:

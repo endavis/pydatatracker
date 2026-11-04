@@ -718,3 +718,176 @@ def test_locked_instance_still_allows_delete() -> None:
 
     assert not hasattr(obj, "name")
     assert len(obj.tracking_changes()) == before
+
+
+# --- Assignment equality and the unset marker (#59) ---
+
+
+class AmbiguousTruth:
+    """Array-like truth values require an explicit reduction."""
+
+    def __bool__(self) -> bool:
+        raise ValueError("The truth value is ambiguous")
+
+
+class EqualityValue:
+    """Model values with non-scalar or failing equality without a dependency."""
+
+    def __init__(self, result: object, error: type[Exception] | None = None) -> None:
+        self.result = result
+        self.error = error
+
+    def __eq__(self, other: object) -> object:  # type: ignore[override]
+        # Array libraries deliberately return non-bool objects from equality.
+        if self.error is not None:
+            raise self.error("Equality is unavailable")
+        return self.result
+
+
+class MonitoredValue(TrackedAttr):
+    """Give the dynamic attribute an explicit type for test assignments."""
+
+    value: object
+
+
+def _monitor_value(value: object) -> MonitoredValue:
+    obj = MonitoredValue(tracking_auto_convert=False, tracking_record_init=False)
+    obj.value = value
+    obj.tracking_add_attribute_to_monitor("value")
+    return obj
+
+
+@pytest.mark.parametrize("declared", [False, True])
+def test_attr_records_equal_numeric_type_changes_in_sequence(declared: bool) -> None:
+    obj = DeclaredAttr() if declared else _monitor_value(0)
+    name = "a" if declared else "value"
+    setattr(obj, name, 0)
+    before = len(obj.tracking_changes())
+
+    for value in (1, 1.0, True):
+        setattr(obj, name, value)
+
+    changes = obj.tracking_changes()[before:]
+    assert len(changes) == 3
+    assert [entry.extra["data_pre_change"] for entry in changes] == ["0", "1", "1.0"]
+    assert [entry.extra["data_post_change"] for entry in changes] == ["1", "1.0", "True"]
+    assert all(entry.extra["action"] == "update" for entry in changes)
+    assert type(getattr(obj, name)) is bool
+
+
+@pytest.mark.parametrize(
+    ("old", "new"), [(1, 1.0), (1, True), (1.0, 1), (1.0, True), (True, 1), (True, 1.0)]
+)
+def test_attr_records_equal_numeric_type_changes_in_both_directions(
+    old: object, new: object
+) -> None:
+    obj = _monitor_value(old)
+    before = len(obj.tracking_changes())
+
+    obj.value = new
+
+    assert len(obj.tracking_changes()) == before + 1
+    assert type(obj.value) is type(new)
+    change = _latest_change(obj)
+    assert change.extra["data_pre_change"] == repr(old)
+    assert change.extra["data_post_change"] == repr(new)
+
+
+@pytest.mark.parametrize(("old", "new"), [(1, 1), (1.0, 1.0), (True, True), ("a", "a"), ([1], [1])])
+def test_attr_equal_values_of_the_same_type_do_not_record_an_update(
+    old: object, new: object
+) -> None:
+    obj = _monitor_value(old)
+    before = len(obj.tracking_changes())
+
+    obj.value = new
+
+    assert len(obj.tracking_changes()) == before
+    assert obj.value is new
+
+
+def test_attr_unset_marker_string_is_a_real_value() -> None:
+    obj: Any = DeclaredAttr()
+    obj.a = "#!NotSet"
+    before = len(obj.tracking_changes())
+
+    obj.a = "later"
+
+    assert len(obj.tracking_changes()) == before + 1
+    assert _latest_change(obj).extra["data_pre_change"] == "#!NotSet"
+    assert obj._tracking_get_original_value("a") == 1
+
+
+def test_attr_reassignment_after_delete_initializes_the_original_value_without_an_update() -> None:
+    obj: Any = DeclaredAttr()
+    del obj.a
+    before = len(obj.tracking_changes())
+
+    obj.a = "#!NotSet"
+
+    assert len(obj.tracking_changes()) == before
+    assert obj._tracking_get_original_value("a") == "#!NotSet"
+
+    obj.a = "later"
+
+    assert len(obj.tracking_changes()) == before + 1
+    assert obj._tracking_get_original_value("a") == "#!NotSet"
+
+
+@pytest.mark.parametrize("result", [[], [False], 0, 1, None, AmbiguousTruth()])
+def test_attr_records_assignment_when_equality_is_not_boolean(result: object) -> None:
+    old = EqualityValue(result)
+    new = EqualityValue(result)
+    obj = _monitor_value(old)
+    before = len(obj.tracking_changes())
+
+    obj.value = new
+
+    assert len(obj.tracking_changes()) == before + 1
+    assert obj.value is new
+    assert _latest_change(obj).extra["action"] == "update"
+
+
+@pytest.mark.parametrize("error", [ValueError, TypeError])
+def test_attr_records_assignment_when_equality_raises(error: type[Exception]) -> None:
+    old = EqualityValue(False, error)
+    new = EqualityValue(False, error)
+    obj = _monitor_value(old)
+    before = len(obj.tracking_changes())
+
+    obj.value = new
+
+    assert len(obj.tracking_changes()) == before + 1
+    assert obj.value is new
+
+
+def test_attr_same_object_assignment_does_not_evaluate_equality_or_record_an_update() -> None:
+    value = EqualityValue(False, ValueError)
+    obj = _monitor_value(value)
+    before = len(obj.tracking_changes())
+
+    obj.value = value
+
+    assert len(obj.tracking_changes()) == before
+    assert obj.value is value
+
+
+def test_attr_type_change_does_not_evaluate_equality_of_the_old_value() -> None:
+    obj = _monitor_value(EqualityValue(False, ValueError))
+    before = len(obj.tracking_changes())
+
+    obj.value = 1
+
+    assert len(obj.tracking_changes()) == before + 1
+    assert obj.value == 1
+
+
+def test_attr_custom_boolean_equality_still_avoids_an_update() -> None:
+    obj = _monitor_value(EqualityValue(True))
+    before = len(obj.tracking_changes())
+    new = EqualityValue(True)
+
+    obj.value = new
+
+    assert len(obj.tracking_changes()) == before
+    assert obj.value is new
