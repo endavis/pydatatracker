@@ -189,8 +189,7 @@ class TrackedList(TrackBase, list):
             index += len(self)
 
         item = self._tracking_store_item(item, index)
-        if not self._tracking_locked:
-            super().__setitem__(index, item)
+        super().__setitem__(index, item)
 
         if old_item is not None and old_item is not item:
             self._tracking_context.setdefault("removed_items", []).append(old_item)
@@ -272,9 +271,8 @@ class TrackedList(TrackBase, list):
         old_item = self[index]
         if index < 0:
             index += len(self)
-        if not self._tracking_locked:
-            super().__delitem__(index)
-            self._tracking_reindex_child_locations()
+        super().__delitem__(index)
+        self._tracking_reindex_child_locations()
 
         self._tracking_context.setdefault("removed_items", []).append(old_item)
         self._tracking_context["action"] = "update"
@@ -300,12 +298,9 @@ class TrackedList(TrackBase, list):
             >>> tracked_list.append('a')  # Append is tracked
 
         """
-        index: str | int = "none"
-
-        if not self._tracking_locked:
-            index = len(self)
-            item = self._tracking_store_item(item, index)
-            super().append(item)
+        index = len(self)
+        item = self._tracking_store_item(item, index)
+        super().append(item)
 
         self._tracking_context["action"] = "add"
         self._tracking_context["value"] = item
@@ -332,14 +327,11 @@ class TrackedList(TrackBase, list):
 
         """
         items = list(items)
-        if not self._tracking_locked:
-            count = len(self)
-            new_data = self._tracking_store_items(
-                (item, count + offset) for offset, item in enumerate(items)
-            )
-            super().extend(new_data)
-        else:
-            new_data = items
+        count = len(self)
+        new_data = self._tracking_store_items(
+            (item, count + offset) for offset, item in enumerate(items)
+        )
+        super().extend(new_data)
 
         extend_length = len(new_data)
         current_leng = len(self)
@@ -429,10 +421,9 @@ class TrackedList(TrackBase, list):
         """
         length = len(self)
         clamped = max(index + length, 0) if index < 0 else min(index, length)
-        if not self._tracking_locked:
-            item = self._tracking_store_item(item, clamped)
-            super().insert(clamped, item)
-            self._tracking_reindex_child_locations()
+        item = self._tracking_store_item(item, clamped)
+        super().insert(clamped, item)
+        self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "add"
         self._tracking_context["value"] = item
@@ -464,9 +455,8 @@ class TrackedList(TrackBase, list):
             index = None
         stored = self[index] if index is not None else None
 
-        if not self._tracking_locked:
-            super().remove(item)
-            self._tracking_reindex_child_locations()
+        super().remove(item)
+        self._tracking_reindex_child_locations()
 
         if index is not None:
             self._tracking_context.setdefault("removed_items", []).append(stored)
@@ -504,15 +494,12 @@ class TrackedList(TrackBase, list):
         """
         passed_index = index
         actual_index = index + len(self) if index < 0 else index
-        item = "###^$^@$^$default###^$^@$^"
-        if not self._tracking_locked:
-            item = super().pop(index)
-            self._tracking_reindex_child_locations()
+        item = super().pop(index)
+        self._tracking_reindex_child_locations()
 
-        if item != "###^$^@$^$default###^$^@$^":
-            self._tracking_context.setdefault("removed_items", []).append(item)
+        self._tracking_context.setdefault("removed_items", []).append(item)
         self._tracking_context["action"] = "remove"
-        self._tracking_context["value"] = None if item == "###^$^@$^$default###^$^@$^" else item
+        self._tracking_context["value"] = item
         self._tracking_context["location"] = actual_index
         self._tracking_context["passed_index"] = passed_index
 
@@ -531,13 +518,12 @@ class TrackedList(TrackBase, list):
             >>> tracked_list.clear()  # Clear is tracked
 
         """
-        if not self._tracking_locked:
-            if not list.__len__(self):
-                return  # no-op: records nothing
-            for item in self:
-                self._tracking_context.setdefault("removed_items", []).append(item)
+        if not list.__len__(self):
+            return  # no-op: records nothing
+        for item in self:
+            self._tracking_context.setdefault("removed_items", []).append(item)
 
-            super().clear()
+        super().clear()
 
         self._tracking_context["action"] = "remove"
 
@@ -564,12 +550,11 @@ class TrackedList(TrackBase, list):
             >>> tracked_list.sort(reverse=True)  # Sort is tracked
 
         """
-        if not self._tracking_locked:
-            before = list(list.__iter__(self))
-            super().sort(key=key, reverse=reverse)
-            if self._tracking_order_unchanged(before):
-                return  # no-op: records nothing
-            self._tracking_reindex_child_locations()
+        before = list(list.__iter__(self))
+        super().sort(key=key, reverse=reverse)
+        if self._tracking_order_unchanged(before):
+            return  # no-op: records nothing
+        self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "update"
 
@@ -587,12 +572,11 @@ class TrackedList(TrackBase, list):
             >>> tracked_list.reverse()  # Reverse is tracked
 
         """
-        if not self._tracking_locked:
-            before = list(list.__iter__(self))
-            super().reverse()
-            if self._tracking_order_unchanged(before):
-                return  # no-op: records nothing
-            self._tracking_reindex_child_locations()
+        before = list(list.__iter__(self))
+        super().reverse()
+        if self._tracking_order_unchanged(before):
+            return  # no-op: records nothing
+        self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "update"
 
