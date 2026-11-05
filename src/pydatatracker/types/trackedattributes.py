@@ -41,14 +41,18 @@ Classes:
 # Standard Library
 import contextlib
 import sys
-from typing import TYPE_CHECKING, Any, ClassVar
+from collections.abc import Iterator
+from typing import Any, ClassVar
 
 # 3rd Party
 # Project
-from ..types._trackbase import TrackBase, _TreeLockHold, track_changes
-
-if TYPE_CHECKING:
-    from ..utils.changelog import ChangeLogEntry
+from ..types._trackbase import (
+    _TREE_MISSING,
+    TrackBase,
+    _TrackingKind,
+    _TreeLockHold,
+    track_changes,
+)
 
 _NOT_SET = object()
 
@@ -75,6 +79,7 @@ class TrackedAttr(TrackBase):
 
     """
 
+    _tracking_kind: ClassVar[_TrackingKind] = "TrackedAttr"
     _tracking_fields: ClassVar[tuple[str, ...]] = ()
     _tracking_declared_fields: ClassVar[tuple[str, ...]] = ()
 
@@ -244,41 +249,6 @@ class TrackedAttr(TrackBase):
                 self._tracking_child_tracked_items[uuid]["location"] = present[uuid]
             return
         self._tracking_remove_child_tracked_item(old_value)
-
-    def _tracking_notify_observers(self, change_log_entry: "ChangeLogEntry") -> None:
-        """Notify observers of attribute changes.
-
-        This method notifies observers of changes to tracked attributes by creating
-        a new change log entry if necessary and updating the tracking context. It
-        ensures that any changes to the attributes are communicated to the observers,
-        maintaining the integrity of the tracking system.
-
-        Args:
-            change_log_entry: The entry in the change log that describes the
-                attribute change.
-
-        Returns:
-            None
-
-        """
-        if (
-            change_log_entry.tracked_item_uuid != self._tracking_uuid
-            and change_log_entry.tracked_item_uuid in self._tracking_child_tracked_items
-        ):
-            child = self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid]
-            location = child["location"]
-            new_change = change_log_entry.copy(change_log_entry.extra["type"], self._tracking_uuid)
-            new_change.add_to_tree(self._tracking_format_tree_location(location))
-            if "location" in new_change.extra:
-                new_change.extra["location"] = (
-                    f"{location}{child['item']._tracking_delimiter}{new_change.extra['location']}"
-                )
-            else:
-                new_change.extra["location"] = f"{location}"
-            change_log_entry = new_change
-
-        self._tracking_record_change(change_log_entry)
-        super()._tracking_notify_observers(change_log_entry)
 
     def _tracking_start_monitoring(self, attribute_name: str, value: Any) -> None:
         """Convert a monitored attribute's value, store it and log ``start monitoring``.
@@ -634,8 +604,8 @@ class TrackedAttr(TrackBase):
             self._tracking_release_child(old_value)
 
     def _tracking_known_uuids_tree(
-        self, level: int = 0, attribute_name: str = "", emptybar: dict | None = None
-    ) -> list:
+        self, level: int = 0, emptybar: dict[int, bool] | None = None, attribute_name: str = ""
+    ) -> list[str]:
         """Generate a tree of known UUIDs for tracked attributes.
 
         This method generates a hierarchical representation of known UUIDs for
@@ -645,74 +615,44 @@ class TrackedAttr(TrackBase):
 
         Args:
             level: The current level of the tree traversal.
-            attribute_name: The name of the attribute to start the traversal from.
             emptybar: A dictionary to track the state of the tree traversal.
+            attribute_name: The name of the attribute to start the traversal from.
 
         Returns:
             A list of strings representing the tree structure of known UUIDs.
 
         """
+        if not attribute_name:
+            return super()._tracking_known_uuids_tree(level, emptybar)
         if emptybar is None:
             emptybar = {}
-        known_uuids = []
+        known_uuids: list[str] = []
         if level == 0:
             emptybar[level] = True
             known_uuids.append(f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}")
             level += 1
-        if attribute_name:
-            emptybar[level] = True
-            pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))
-            value = getattr(self, attribute_name)
-            known_uuids.append(
-                f"{pre_string} |-> Location: {attribute_name} Item: "
-                f"{self._tracking_is_trackable(value)}:{value._tracking_uuid}"
-            )
+        emptybar[level] = True
+        pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))
+        value = getattr(self, attribute_name)
+        known_uuids.append(
+            f"{pre_string} |-> Location: {attribute_name} Item: "
+            f"{self._tracking_is_trackable(value)}:{value._tracking_uuid}"
+        )
 
-            known_uuids.extend(value._tracking_known_uuids_tree(level + 1, emptybar=emptybar))
-
-        else:
-            emptybar[level] = False
-            left = self._tracking_attributes_to_monitor[:]
-            pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))
-            for attribute_name in self._tracking_attributes_to_monitor:
-                left.remove(attribute_name)
-                if not left:
-                    emptybar[level] = True
-                try:
-                    value = getattr(self, attribute_name)
-                except AttributeError:
-                    continue
-                if self._tracking_is_trackable(value):
-                    known_uuids.append(
-                        f"{pre_string} |-> Location: {attribute_name} Item: "
-                        f"{self._tracking_is_trackable(value)}:{value._tracking_uuid}"
-                    )
-
-                    known_uuids.extend(
-                        value._tracking_known_uuids_tree(level + 1, emptybar=emptybar)
-                    )
+        known_uuids.extend(value._tracking_known_uuids_tree(level + 1, emptybar=emptybar))
         return known_uuids
 
-    def _tracking_format_tree_location(self, location: str | None = None) -> dict[str, str]:
-        """Format the tree location for a tracked attribute.
+    def _tracking_tree_children(self) -> Iterator[tuple[str, Any, bool]]:
+        """Yield one ``(name, value, is_last)`` row per monitored attribute.
 
-        This method constructs a dictionary that represents the type, UUID, and
-        location of the tracked attribute within a hierarchical structure. It
-        provides a way to format the information for better organization and
-        visualization of tracked attributes.
-
-        Args:
-            location: The location identifier for the tracked attribute.
-
-        Returns:
-            A dictionary containing the type, UUID, and location of the tracked
-            attribute.
-
+        A monitored name with no value yet yields ``_TREE_MISSING``, which is not
+        trackable, so it is skipped.
         """
-        if location is not None:
-            return {
-                "type": self._tracking_is_trackable(self),
-                "uuid": self._tracking_uuid,
-                "location": f".{location}",
-            }
-        return {"type": self._tracking_is_trackable(self), "uuid": self._tracking_uuid}
+        left = self._tracking_attributes_to_monitor[:]
+        for attribute_name in self._tracking_attributes_to_monitor:
+            left.remove(attribute_name)
+            try:
+                value = getattr(self, attribute_name)
+            except AttributeError:
+                value = _TREE_MISSING
+            yield attribute_name, value, not left

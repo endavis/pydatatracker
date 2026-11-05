@@ -49,9 +49,9 @@ import logging
 import threading
 import weakref
 from collections import deque
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import wraps
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 from uuid import uuid4
 
 # 3rd Party
@@ -62,20 +62,12 @@ from .actor import current_actor
 # Argument types that can never hold a tracked value; the pre-merge scan skips them.
 _SCALAR_TYPES: frozenset[type] = frozenset({int, str, float, bool, bytes, type(None)})
 
-# Resolved on first use: the tracked types import this module, so they cannot
-# be imported at module level here.
-_trackable_classes: tuple[type, type, type] | None = None
+# The kind a tracked type reports for ``_tracking_is_trackable``; "" means not tracked.
+_TrackingKind = Literal["TrackedDict", "TrackedList", "TrackedAttr", ""]
 
-
-def _load_trackable_classes() -> tuple[type, type, type]:
-    """Import and cache the (TrackedDict, TrackedList, TrackedAttr) classes."""
-    global _trackable_classes
-    from .trackedattributes import TrackedAttr
-    from .trackeddict import TrackedDict
-    from .trackedlist import TrackedList
-
-    _trackable_classes = (TrackedDict, TrackedList, TrackedAttr)
-    return _trackable_classes
+# Yielded by ``_tracking_tree_children`` for a monitored name with no value yet. It is
+# not trackable, so the uuid-tree skips it.
+_TREE_MISSING: Any = object()
 
 
 def _lock_owned(lock: Any) -> bool:
@@ -388,6 +380,11 @@ class TrackBase:
     """
 
     _tracking_record_init: bool = True
+
+    # Set by each tracked type; ``_tracking_is_trackable`` reports it.
+    _tracking_kind: ClassVar[_TrackingKind] = ""
+    # True where tree locations are subscripts (``['k']``) rather than delimiter-led.
+    _tracking_subscript_locations: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -1166,7 +1163,12 @@ class TrackBase:
         return [entry for entry in self._tracking_changes if entry.created_time >= threshold]
 
     def _tracking_notify_observers(self, change_log_entry: ChangeLogEntry) -> None:
-        """Notify all observers of changes to a tracked object.
+        """Re-home, record and notify observers of a change entry.
+
+        An entry that came from a linked child is first copied and re-homed under this
+        object: the child's location is added to the tree and prefixed to
+        ``extra["location"]``. The (possibly re-homed) entry is then recorded here,
+        which is a no-op for an entry this object created itself, and passed on.
 
         This method iterates through the list of observers, sorted by priority, and
         notifies each observer of the provided change log entry. It ensures that all
@@ -1191,6 +1193,24 @@ class TrackBase:
             ExceptionGroup: Every exception raised, when more than one observer failed.
 
         """
+        if (
+            change_log_entry.tracked_item_uuid != self._tracking_uuid
+            and change_log_entry.tracked_item_uuid in self._tracking_child_tracked_items
+        ):
+            child = self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid]
+            location = child["location"]
+            new_change = change_log_entry.copy(change_log_entry.extra["type"], self._tracking_uuid)
+            new_change.add_to_tree(self._tracking_format_tree_location(location))
+            if "location" in new_change.extra:
+                new_change.extra["location"] = (
+                    f"{location}{child['item']._tracking_delimiter}{new_change.extra['location']}"
+                )
+            else:
+                new_change.extra["location"] = f"{location}"
+            change_log_entry = new_change
+
+        self._tracking_record_change(change_log_entry)
+
         failures: list[Exception] = []
         priorities = sorted(self._tracking_observers.keys())
         for priority in priorities:
@@ -1297,14 +1317,13 @@ class TrackBase:
         self._tracking_changes.append(change_log_entry)
         return True
 
-    def _tracking_format_tree_location(self, location: str | None = "") -> dict[str, str]:
+    def _tracking_format_tree_location(self, location: Any = None) -> dict[str, str]:
         """Format the tree location for a change log entry.
 
-        This method constructs a dictionary representing the location of the tracked
-        object within the tracking structure. It includes the type of the object, its
-        UUID, and the location within the hierarchy, formatted with the specified
-        delimiter. It provides a way to format the information for better organization
-        and visualization of tracked attributes.
+        Builds the dictionary holding this object's type, UUID and, when a location is
+        given, its location in the hierarchy. The location is a subscript such as
+        ``['k']`` for types with ``_tracking_subscript_locations`` and otherwise the
+        delimiter followed by the location.
 
         Args:
             location: The location of the tracked object within the hierarchy.
@@ -1314,13 +1333,87 @@ class TrackBase:
             tracked object.
 
         """
-        if location is not None:
-            return {
-                "type": self._tracking_is_trackable(self),
-                "uuid": self._tracking_uuid,
-                "location": f"{self._tracking_delimiter}{location}",
-            }
-        return {"type": self._tracking_is_trackable(self), "uuid": self._tracking_uuid}
+        if location is None:
+            return {"type": self._tracking_is_trackable(self), "uuid": self._tracking_uuid}
+        formatted = (
+            f"[{location!r}]"
+            if self._tracking_subscript_locations
+            else f"{self._tracking_delimiter}{location}"
+        )
+        return {
+            "type": self._tracking_is_trackable(self),
+            "uuid": self._tracking_uuid,
+            "location": formatted,
+        }
+
+    def _tracking_tree_children(self) -> Iterator[tuple[str, Any, bool]]:
+        """Yield the ``(label, value, is_last)`` rows of this object's uuid tree.
+
+        The base object has no children. Each tracked type overrides this to yield
+        one row per child slot, with ``is_last`` set on the final slot.
+
+        Yields:
+            The location label, the value held there and whether it is the last slot.
+
+        """
+        yield from ()
+
+    def _tracking_known_uuids_tree(
+        self, level: int = 0, emptybar: dict[int, bool] | None = None
+    ) -> list[str]:
+        """Generate a list of known UUIDs in a tree structure.
+
+        This method generates a list of known UUIDs for tracked items, formatted as a
+        tree structure. It helps visualize the hierarchy and relationships between
+        tracked items.
+
+        Args:
+            level: The current depth level in the tree.
+            emptybar: A dictionary tracking whether to show empty bars at each
+                level.
+
+        Returns:
+            A list of strings representing the formatted UUID tree structure.
+
+        """
+        if emptybar is None:
+            emptybar = {}
+        known_uuids: list[str] = []
+        if level == 0:
+            emptybar[level] = True
+            known_uuids.append(f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}")
+            level += 1
+        emptybar[level] = False
+        pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))
+        self._tracking_known_uuids_tree_helper(known_uuids, emptybar, level, pre_string)
+        return known_uuids
+
+    def _tracking_known_uuids_tree_helper(
+        self,
+        known_uuids: list[str],
+        emptybar: dict[int, bool],
+        level: int,
+        pre_string: str,
+    ) -> None:
+        """Append a row, and its subtree, for each trackable child.
+
+        Args:
+            known_uuids: The list to append the formatted UUID strings to.
+            emptybar: A dictionary tracking whether to show empty bars at each
+                level.
+            level: The current depth level in the tree.
+            pre_string: The prefix string for formatting the tree structure.
+
+        """
+        for label, value, is_last in self._tracking_tree_children():
+            if is_last:
+                emptybar[level] = True
+            kind = self._tracking_is_trackable(value)
+            if kind:
+                known_uuids.append(
+                    f"{pre_string} |-> Location: {label} Item: {kind}:{value._tracking_uuid}"
+                )
+                known_uuids.extend(value._tracking_known_uuids_tree(level + 1, emptybar=emptybar))
 
     def lock(self) -> None:
         """Lock the instance and all child tracked items.
@@ -1436,9 +1529,7 @@ class TrackBase:
             )
         return obj
 
-    def _tracking_is_trackable(
-        self, obj: Any
-    ) -> Literal["TrackedDict"] | Literal["TrackedList"] | Literal["TrackedAttr"] | Literal[""]:
+    def _tracking_is_trackable(self, obj: Any) -> _TrackingKind:
         """Check if an object is trackable.
 
         This method determines if the provided object is an instance of a trackable
@@ -1454,18 +1545,7 @@ class TrackBase:
             if the object is not trackable.
 
         """
-        classes = _trackable_classes
-        if classes is None:
-            classes = _load_trackable_classes()
-        tracked_dict, tracked_list, tracked_attr = classes
-
-        if isinstance(obj, tracked_dict):
-            return "TrackedDict"
-        elif isinstance(obj, tracked_list):
-            return "TrackedList"
-        elif isinstance(obj, tracked_attr):
-            return "TrackedAttr"
-        return ""
+        return type(obj)._tracking_kind if isinstance(obj, TrackBase) else ""
 
     def _tracking_convert_to_untrackable(self, obj: Any) -> Any:
         """Convert a trackable object to its untrackable form.
@@ -1483,12 +1563,9 @@ class TrackBase:
             trackable.
 
         """
-        from ..types.trackeddict import TrackedDict
-        from ..types.trackedlist import TrackedList
-
-        if self._tracking_is_trackable(obj):
-            if isinstance(obj, TrackedDict):
-                return {item: self._tracking_convert_to_untrackable(obj[item]) for item in obj}
-            if isinstance(obj, TrackedList):
-                return [self._tracking_convert_to_untrackable(item) for item in obj]
+        kind = self._tracking_is_trackable(obj)
+        if kind == "TrackedDict":
+            return {item: self._tracking_convert_to_untrackable(obj[item]) for item in obj}
+        if kind == "TrackedList":
+            return [self._tracking_convert_to_untrackable(item) for item in obj]
         return obj

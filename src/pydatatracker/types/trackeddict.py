@@ -41,15 +41,12 @@ Classes:
 """
 
 # Standard Library
-from collections.abc import Hashable
-from typing import TYPE_CHECKING, Any, Self
+from collections.abc import Hashable, Iterator
+from typing import Any, ClassVar, Self
 
 # 3rd Party
 # Project
-from ._trackbase import TrackBase, check_lock, merges_trees, track_changes
-
-if TYPE_CHECKING:
-    from ..utils.changelog import ChangeLogEntry
+from ._trackbase import TrackBase, _TrackingKind, check_lock, merges_trees, track_changes
 
 # Sentinel distinguishing "no default given" from an explicit ``default=None``.
 _MISSING: Any = object()
@@ -65,6 +62,9 @@ class TrackedDict(TrackBase, dict):
     observers of changes, and maintaining a history of original values.
 
     """
+
+    _tracking_kind: ClassVar[_TrackingKind] = "TrackedDict"
+    _tracking_subscript_locations: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -147,51 +147,6 @@ class TrackedDict(TrackBase, dict):
             if uuid is not None and uuid not in locations:
                 locations[uuid] = key
         return locations
-
-    def _tracking_notify_observers(self, change_log_entry: "ChangeLogEntry") -> None:
-        """Notify observers of a change in the tracked dictionary.
-
-        This method is called to notify all registered observers about a change in the
-        tracked dictionary. It processes the change log entry, updates the tracking
-        context, and ensures that the change is propagated to all observers.
-
-        Args:
-            change_log_entry: The entry in the change log that describes the
-                attribute change.
-
-        """
-        if (
-            change_log_entry.tracked_item_uuid != self._tracking_uuid
-            and change_log_entry.tracked_item_uuid in self._tracking_child_tracked_items
-        ):
-            new_change = change_log_entry.copy(change_log_entry.extra["type"], self._tracking_uuid)
-            new_change.add_to_tree(
-                self._tracking_format_tree_location(
-                    self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid][
-                        "location"
-                    ]
-                )
-            )
-
-            if "location" in new_change.extra:
-                delimiter = self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid][
-                    "item"
-                ]._tracking_delimiter
-                location = self._tracking_child_tracked_items[change_log_entry.tracked_item_uuid][
-                    "location"
-                ]
-                new_change.extra["location"] = (
-                    f"{location}{delimiter}{new_change.extra['location']}"
-                )
-            else:
-                tracked_item = self._tracking_child_tracked_items[
-                    change_log_entry.tracked_item_uuid
-                ]
-                new_change.extra["location"] = f"{tracked_item['location']}"
-            change_log_entry = new_change
-
-        self._tracking_record_change(change_log_entry)
-        super()._tracking_notify_observers(change_log_entry)
 
     @check_lock
     @track_changes
@@ -481,72 +436,12 @@ class TrackedDict(TrackBase, dict):
         """Fill the dictionary without tracking or conversion."""
         dict.update(self, payload)
 
-    def _tracking_known_uuids_tree(
-        self, level: int = 0, emptybar: dict[int, bool] | None = None
-    ) -> list[str]:
-        """Generate a list of known UUIDs in a tree structure.
-
-        This method generates a list of known UUIDs for tracked items in the
-        dictionary, formatted as a tree structure. It helps visualize the
-        hierarchy and relationships between tracked items.
-
-        Args:
-            level: The current depth level in the tree.
-            emptybar: A dictionary tracking whether to show empty bars at each
-                level.
-
-        Returns:
-            A list of strings representing the formatted UUID tree structure.
-
-        """
-        if emptybar is None:
-            emptybar = {}
-        known_uuids: list[str] = []
-        if level == 0:
-            emptybar[level] = True
-            known_uuids.append(f"{self._tracking_is_trackable(self)}:{self._tracking_uuid}")
-            level += 1
-        emptybar[level] = False
-        pre_string = "".join("    " if emptybar[i] else " |  " for i in range(level))
-        self._tracking_known_uuids_tree_helper(known_uuids, emptybar, level, pre_string)
-        return known_uuids
-
-    def _tracking_known_uuids_tree_helper(
-        self,
-        known_uuids: list[str],
-        emptybar: dict[int, bool],
-        level: int,
-        pre_string: str,
-    ) -> None:
-        """Help method to generate a list of known UUIDs in a tree structure.
-
-        This helper method assists in generating a list of known UUIDs for tracked
-        items in the dictionary, formatted as a tree structure. It helps visualize
-        the hierarchy and relationships between tracked items.
-
-        Args:
-            known_uuids: The list to append the formatted UUID strings to.
-            emptybar: A dictionary tracking whether to show empty bars at each
-                level.
-            level: The current depth level in the tree.
-            pre_string: The prefix string for formatting the tree structure.
-
-        """
+    def _tracking_tree_children(self) -> Iterator[tuple[str, Any, bool]]:
+        """Yield one ``(['key'], value, is_last)`` row per key."""
         left = list(self.keys())
         for key in self:
             left.remove(key)
-            if not left:
-                emptybar[level] = True
-            if self._tracking_is_trackable(self[key]):
-                known_uuids.append(
-                    f"{pre_string} |-> "
-                    f"Location: ['{key}'] "
-                    f"Item: {self._tracking_is_trackable(self[key])}:"
-                    f"{self[key]._tracking_uuid}"
-                )
-                known_uuids.extend(
-                    self[key]._tracking_known_uuids_tree(level + 1, emptybar=emptybar)
-                )
+            yield f"['{key}']", self[key], not left
 
     def __ior__(  # type: ignore[misc]  # pyright: ignore[reportIncompatibleMethodOverride]
         self, other: Any
@@ -570,26 +465,3 @@ class TrackedDict(TrackBase, dict):
         """
         self.update(other)
         return self
-
-    def _tracking_format_tree_location(self, location: str | int | None = None) -> dict:
-        """Format the tree location for tracking purposes.
-
-        This method formats the location of a tracked item in the dictionary as a
-        dictionary containing the type, UUID, and location of the item. It helps
-        in visualizing and managing the hierarchy and relationships between tracked
-        items.
-
-        Args:
-            location: The location of the tracked item in the dictionary.
-
-        Returns:
-            A dictionary containing the type, UUID, and location of the tracked item.
-
-        """
-        if location is not None:
-            return {
-                "type": self._tracking_is_trackable(self),
-                "uuid": self._tracking_uuid,
-                "location": f"[{location!r}]",
-            }
-        return {"type": self._tracking_is_trackable(self), "uuid": self._tracking_uuid}
