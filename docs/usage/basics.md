@@ -181,6 +181,14 @@ their parent. `tracking_add_attribute_to_monitor` still records `start monitorin
 dynamic attributes. You may call it before the attribute is set: the name is registered at
 once and the first assignment records `start monitoring`, the same log as setting first.
 
+### What auto-convert converts
+
+With `tracking_auto_convert=True`, a container converts only values whose exact type is `dict` or
+`list`, recursively. A subclass instance (`defaultdict`, `OrderedDict`, `Counter`, your own
+`class Foo(dict)`) is stored as-is: it keeps its type and behavior (a `defaultdict` still builds
+missing keys) but its contents are not tracked. Replacing such a value is still recorded as a
+change on the container. To track your own types, convert them in `_tracking_convert_item`, below.
+
 ### Converting items on insert
 
 `TrackedList` and `TrackedDict` call `_tracking_convert_item(value, location)` for every value

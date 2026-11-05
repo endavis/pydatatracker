@@ -1394,9 +1394,11 @@ class TrackBase:
     ) -> Any:
         """Convert an object to a trackable type if necessary.
 
-        This method checks if the provided object is a dictionary or a list and
-        converts it to a `TrackedDict` or `TrackedList` respectively, if it is not
-        already trackable. It ensures that the object is appropriately formatted
+        This method converts an object whose exact type is ``dict`` or ``list`` to a
+        `TrackedDict` or `TrackedList` respectively. Subclass instances
+        (``defaultdict``, ``OrderedDict``, ``Counter``, user subclasses) and already
+        tracked containers are returned unchanged; override ``_tracking_convert_item``
+        to convert your own types. It ensures that the object is appropriately formatted
         for tracking purposes, allowing for consistent monitoring of changes.
 
         Args:
@@ -1413,7 +1415,7 @@ class TrackBase:
             is performed.
 
         """
-        if isinstance(obj, dict) and not self._tracking_is_trackable(obj):
+        if type(obj) is dict:
             from .trackeddict import TrackedDict
 
             return TrackedDict(
@@ -1423,7 +1425,7 @@ class TrackBase:
                 tracking_parent=tracking_parent,
                 tracking_location=tracking_location,
             )
-        if isinstance(obj, list) and not self._tracking_is_trackable(obj):
+        if type(obj) is list:
             from .trackedlist import TrackedList
 
             return TrackedList(

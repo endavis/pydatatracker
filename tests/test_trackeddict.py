@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections import deque
+from collections import Counter, OrderedDict, defaultdict, deque
+from typing import Any
 
 import pytest
 
-from pydatatracker import TrackedDict, TrackedList
+from pydatatracker import TrackedAttr, TrackedDict, TrackedList
 from pydatatracker.utils.changelog import ChangeLogEntry
 
 
@@ -428,3 +429,83 @@ def test_tracked_dict_pop_present_key_with_default_removes_and_logs() -> None:
     assert change.extra["location"] == "a"
     assert change.extra["removed_items"] == "[1]"
     assert "a" not in tracked
+
+
+class _UserDict(dict[str, int]):
+    """User dict subclass."""
+
+
+class _UserList(list[int]):
+    """User list subclass."""
+
+
+def _subclass_values() -> list[Any]:
+    return [
+        defaultdict(list),
+        OrderedDict(a=1),
+        Counter("aab"),
+        _UserDict(a=1),
+        _UserList([1]),
+    ]
+
+
+def test_auto_convert_defaultdict_missing_key_repro() -> None:
+    """The #60 repro: a defaultdict value keeps its factory."""
+    d = TrackedDict({"x": defaultdict(list)}, tracking_auto_convert=True)
+    d["x"]["missing"].append(1)
+    assert d["x"] == {"missing": [1]}
+    assert type(d["x"]) is defaultdict
+
+
+@pytest.mark.parametrize("value", _subclass_values())
+def test_auto_convert_keeps_subclass_in_dict(value: object) -> None:
+    tracked = TrackedDict({"k": value}, tracking_auto_convert=True)
+    assert tracked["k"] is value
+    tracked["j"] = value
+    assert tracked["j"] is value
+
+
+@pytest.mark.parametrize("value", _subclass_values())
+def test_auto_convert_keeps_subclass_in_list(value: object) -> None:
+    tracked = TrackedList([value], tracking_auto_convert=True)
+    tracked.append(value)
+    assert tracked[0] is value
+    assert tracked[1] is value
+
+
+@pytest.mark.parametrize("value", _subclass_values())
+def test_auto_convert_keeps_subclass_in_attr(value: object) -> None:
+    class Holder(TrackedAttr):
+        def __init__(self) -> None:
+            super().__init__(tracking_auto_convert=True)
+            self.item: Any = None
+            self.tracking_add_attribute_to_monitor("item")
+
+    holder = Holder()
+    holder.item = value
+    assert holder.item is value
+
+
+def test_auto_convert_still_converts_plain_dict_and_list() -> None:
+    tracked = TrackedDict({"d": {"n": {"m": 1}}, "l": [1, {"a": 1}]}, tracking_auto_convert=True)
+    assert type(tracked["d"]) is TrackedDict
+    assert type(tracked["d"]["n"]) is TrackedDict
+    assert type(tracked["l"]) is TrackedList
+    assert type(tracked["l"][1]) is TrackedDict
+    lst = TrackedList([{"a": 1}, [1]], tracking_auto_convert=True)
+    assert type(lst[0]) is TrackedDict
+    assert type(lst[1]) is TrackedList
+
+
+def test_auto_convert_keeps_tracked_containers_unwrapped() -> None:
+    child = TrackedDict({"a": 1})
+    tracked = TrackedDict({"c": child}, tracking_auto_convert=True)
+    assert tracked["c"] is child
+
+
+def test_replacing_subclass_value_is_recorded() -> None:
+    tracked = TrackedDict({"k": defaultdict(list)}, tracking_auto_convert=True)
+    before = len(tracked.tracking_changes())
+    tracked["k"] = OrderedDict(a=1)
+    assert len(tracked.tracking_changes()) == before + 1
+    assert type(tracked["k"]) is OrderedDict
