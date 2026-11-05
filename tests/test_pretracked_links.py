@@ -1,6 +1,8 @@
 """Tests for linking already-tracked values stored into a tracked container (#67)."""
 
 import copy
+import pickle
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -261,9 +263,84 @@ def test_list_cycle_through_nested_child() -> None:
 
 
 # ---- 6. copy and pickle -------------------------------------------------------
-# deepcopy of a tree holding children, and pickle of a non-empty dict, already fail on
-# main (weak observers are not picklable; items are set before __setstate__), so only
-# copy.copy is exercised with children.
+
+
+Duplicator = Callable[[TrackedDict], TrackedDict]
+
+
+def _deepcopy(obj: TrackedDict) -> TrackedDict:
+    return copy.deepcopy(obj)
+
+
+def _pickle_round_trip(obj: TrackedDict) -> TrackedDict:
+    # Round-trips an object this test just built; no untrusted data is loaded.
+    restored: TrackedDict = pickle.loads(pickle.dumps(obj))
+    return restored
+
+
+DUPLICATORS = [
+    pytest.param(_deepcopy, id="deepcopy"),
+    pytest.param(_pickle_round_trip, id="pickle"),
+]
+
+
+@pytest.mark.parametrize("duplicate", DUPLICATORS)
+def test_duplicate_tree_with_prebuilt_child_relinks_a_copied_child(duplicate: Duplicator) -> None:
+    parent = TrackedDict()
+    child = TrackedDict({"x": 0})
+    parent["c"] = child
+
+    clone = duplicate(parent)
+
+    clone_child = clone["c"]
+    assert clone_child is not child
+    assert _is_child(clone, clone_child)
+    assert set(clone_child._tracking_parents) == {clone._tracking_uuid}
+    assert clone_child._tracking_tree_lock is clone._tracking_tree_lock
+    assert clone._tracking_tree_lock is not parent._tracking_tree_lock
+    before = len(parent.tracking_changes())
+    clone_child["x"] = 1
+    assert clone.tracking_changes()[-1].extra["location"] == "c:x"
+    assert len(parent.tracking_changes()) == before
+    assert child["x"] == 0
+
+
+@pytest.mark.parametrize("duplicate", DUPLICATORS)
+def test_duplicate_child_with_two_parents_has_no_parents(duplicate: Duplicator) -> None:
+    a = TrackedDict()
+    b = TrackedDict()
+    child = TrackedDict({"x": 0})
+    a["c"] = child
+    b["k"] = child
+
+    clone = duplicate(child)
+
+    assert clone._tracking_parents == {}
+    assert clone._tracking_tree_lock is not a._tracking_tree_lock
+    a_before, b_before = len(a.tracking_changes()), len(b.tracking_changes())
+    clone["x"] = 1
+    assert (len(a.tracking_changes()), len(b.tracking_changes())) == (a_before, b_before)
+
+
+def test_deepcopy_keeps_a_shared_child_shared_between_copied_parents() -> None:
+    root = TrackedDict()
+    a = TrackedDict()
+    b = TrackedDict()
+    child = TrackedDict({"x": 0})
+    root["a"] = a
+    root["b"] = b
+    a["c"] = child
+    b["c"] = child
+
+    clone = copy.deepcopy(root)
+
+    assert clone["a"]["c"] is clone["b"]["c"]
+    shared = clone["a"]["c"]
+    assert set(shared._tracking_parents) == {clone["a"]._tracking_uuid, clone["b"]._tracking_uuid}
+    assert shared._tracking_tree_lock is clone._tracking_tree_lock
+    shared["x"] = 1
+    locations = [e.extra["location"] for e in clone.tracking_changes()[-2:]]
+    assert sorted(locations) == ["a:c:x", "b:c:x"]
 
 
 def test_shallow_copy_of_child_and_parent_with_links() -> None:

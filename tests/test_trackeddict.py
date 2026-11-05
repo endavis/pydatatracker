@@ -97,13 +97,13 @@ def test_tracked_dict_copy_untracked_returns_plain_dict() -> None:
     """`copy(untracked=True)` returns regular dictionaries."""
     tracked = TrackedDict({"a": {"nested": 1}}, tracking_auto_convert=True)
 
+    before = len(tracked.tracking_changes())
+
     clone = tracked.copy(untracked=True)
 
-    change = _latest_change(tracked)
     assert isinstance(clone, dict)
     assert isinstance(clone["a"], dict)
-    assert change.extra["action"] == "copy"
-    assert change.extra["untracked"] == "True"
+    assert len(tracked.tracking_changes()) == before
 
 
 def test_tracked_dict_snapshot_opt_in_records_repr() -> None:

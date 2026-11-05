@@ -440,33 +440,36 @@ class TrackedDict(TrackBase, dict):
 
         self._tracking_context["action"] = "remove"
 
-    @check_lock
-    @track_changes
     def copy(self, untracked: bool = True) -> dict:
-        """Create a copy of the dictionary with optional tracking removal.
+        """Return a copy of the dictionary; this is a read.
 
-        This method creates a copy of the tracked dictionary. If the `untracked`
-        parameter is set to True, the copy will not include tracking capabilities.
-        The operation is tracked, and the tracking context is updated with details
-        about the copied dictionary.
+        It records no change entry and works on a locked dictionary. The result is
+        always a plain ``dict``, never tracked. For an independent tracked copy use
+        ``copy.copy``, ``copy.deepcopy`` or ``pickle``.
 
         Args:
-            untracked: Boolean flag indicating whether the copy should be untracked.
+            untracked: If True (the default) the copy is deep, with nested tracked
+                values converted to plain ``dict``/``list``. If False it is the
+                shallow ``dict.copy`` result.
 
         Returns:
-            A new dictionary object, either tracked or untracked based on the
-            `untracked` parameter.
+            A plain ``dict``.
 
         Example:
             >>> tracked = TrackedDict({'a': 1})
-            >>> copy_tracked = tracked.copy() # Creates a tracked copy
-            >>> untracked_copy = tracked.copy(untracked=True) # Create an untracked copy
+            >>> plain = tracked.copy()  # deep plain dict
+            >>> shallow = tracked.copy(untracked=False)  # shallow plain dict
 
         """
-        new_object = self._tracking_convert_to_untrackable(self) if untracked else super().copy()
-        self._tracking_context["action"] = "copy"
-        self._tracking_context["untracked"] = untracked
-        return new_object
+        return self._tracking_convert_to_untrackable(self) if untracked else super().copy()
+
+    def _tracking_copy_payload(self) -> Any:
+        """Return the items for a copy."""
+        return list(dict.items(self))
+
+    def _tracking_restore_payload(self, payload: Any) -> None:
+        """Fill the dictionary without tracking or conversion."""
+        dict.update(self, payload)
 
     def _tracking_known_uuids_tree(
         self, level: int = 0, emptybar: dict[int, bool] | None = None

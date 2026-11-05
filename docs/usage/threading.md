@@ -56,3 +56,7 @@ Observers run with the tree lock held.
 ## Copying and pickling
 
 `copy.copy`, `copy.deepcopy` and `pickle` do not carry the lock; the copy gets a fresh one.
+
+Each node is read under its tree lock, but a whole-tree `deepcopy` is not atomic against
+concurrent mutation of the tree. See [Copying and pickling](basics.md#copying-and-pickling) and
+[ADR-0002](../decisions/0002-copies-of-tracked-containers-are-independent-tracked-objects-with-fresh-history.md).

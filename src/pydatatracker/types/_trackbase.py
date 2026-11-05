@@ -42,6 +42,7 @@ Classes:
 """
 
 # Standard Library
+import copy
 import datetime
 import itertools
 import logging
@@ -306,6 +307,38 @@ class _ObserverRef:
         return current is not None and current == observer
 
 
+_TRACKING_RUNTIME_KEYS: frozenset[str] = frozenset(
+    {
+        "_tracking_tree_lock",
+        "_tracking_uuid",
+        "_tracking_observers",
+        "_tracking_context",
+        "_tracking_change_uuids",
+        "_tracking_changes",
+        "_tracking_created",
+        "_tracking_child_tracked_items",
+        "_tracking_parents",
+    }
+)
+"""Instance attributes that are runtime identity and history, never copied or pickled."""
+
+
+def _tracking_rebuild[T](cls: type[T]) -> T:
+    """Create an uninitialised instance of ``cls`` without calling ``__init__``.
+
+    Used by ``__reduce_ex__`` and ``__deepcopy__``; module level so pickle can
+    find it by reference.
+
+    Args:
+        cls: The class to instantiate.
+
+    Returns:
+        A bare instance whose state ``__setstate__`` fills in.
+
+    """
+    return cls.__new__(cls)
+
+
 class TrackBase:
     """Base class for tracking changes to objects.
 
@@ -320,6 +353,11 @@ class TrackBase:
     concurrent mutation of one tree is serialised. Linking a tracked container
     into another tree merges the two trees onto one lock. Reads are not locked. See
     ``docs/usage/threading.md``.
+
+    Copy semantics: ``copy.copy``, ``copy.deepcopy`` and ``pickle`` build an
+    independent tracked object (new uuid, history of only its own ``init`` entry,
+    no observers or parent, configuration and lock state kept, fresh tree lock).
+    ``copy()`` on a container is a read. See ``docs/usage/basics.md``.
 
     """
 
@@ -366,21 +404,10 @@ class TrackBase:
             None
 
         """
-        # One lock per tree: a root owns it, a linked child adopts its parent's.
-        self._tracking_tree_lock: threading.RLock = threading.RLock()
-        # Live parents by uuid. A child can have several, so lock state and
-        # lock merging look at all of them.
-        self._tracking_parents: dict[str, weakref.ref[TrackBase]] = {}
         self._tracking_name = tracking_name
         self._tracking_auto_converted_in = tracking_auto_converted_in
-        self._tracking_uuid = uuid4().hex
-        self._tracking_observers: dict[int, list[_ObserverRef]] = {}
-        self._tracking_context: dict[str, Any] = {}
-        self._tracking_change_uuids: set[str] = set()
         self._tracking_locked = False
         self._tracking_auto_convert = tracking_auto_convert
-        self._tracking_created = datetime.datetime.now()
-        self._tracking_child_tracked_items: dict[str, Any] = {}
         self._tracking_delimiter = tracking_delimiter
         self._tracking_debug_flag = False
         self._tracking_capture_snapshots = kwargs.get("tracking_capture_snapshots", False)
@@ -406,9 +433,7 @@ class TrackBase:
             msg = f"tracking_max_changes must be >= 0 or None, got {max_changes}"
             raise ValueError(msg)
         self._tracking_max_changes = max_changes
-        self._tracking_changes: list[ChangeLogEntry] | deque[ChangeLogEntry] = (
-            [] if max_changes is None else deque(maxlen=max_changes)
-        )
+        self._tracking_reset_runtime_state()
         if "tracking_capture_snapshots" in kwargs:
             self._tracking_capture_snapshots = kwargs["tracking_capture_snapshots"]
         if "tracking_capture_stack" in kwargs:
@@ -420,6 +445,29 @@ class TrackBase:
         # construction entries.
         if tracking_parent is not None:
             tracking_parent._tracking_add_child_tracked_item(tracking_location, self)
+
+    def _tracking_reset_runtime_state(self) -> None:
+        """Create the per-object runtime state: lock, identity, observers and history.
+
+        Every key set here is listed in ``_TRACKING_RUNTIME_KEYS``. Needs
+        ``_tracking_max_changes`` to be set first.
+
+        """
+        # One lock per tree: a root owns it, a linked child adopts its parent's.
+        self._tracking_tree_lock: threading.RLock = threading.RLock()
+        self._tracking_uuid = uuid4().hex
+        self._tracking_observers: dict[int, list[_ObserverRef]] = {}
+        self._tracking_context: dict[str, Any] = {}
+        self._tracking_change_uuids: set[str] = set()
+        self._tracking_created = datetime.datetime.now()
+        self._tracking_child_tracked_items: dict[str, Any] = {}
+        # Live parents by uuid. A child can have several, so lock state and
+        # lock merging look at all of them.
+        self._tracking_parents: dict[str, weakref.ref[TrackBase]] = {}
+        max_changes = self._tracking_max_changes
+        self._tracking_changes: list[ChangeLogEntry] | deque[ChangeLogEntry] = (
+            [] if max_changes is None else deque(maxlen=max_changes)
+        )
 
     def _tracking_convert_value(self, value: Any, location: Any = "") -> Any:
         """Convert a value to a trackable type if automatic conversion is enabled.
@@ -607,6 +655,22 @@ class TrackBase:
             None
 
         """
+        self._tracking_link_child(location, trackable_item, sync_lock=True)
+
+    def _tracking_link_child(
+        self, location: str | None, trackable_item: "TrackBase", sync_lock: bool = False
+    ) -> None:
+        """Register a child, merge its tree lock with this one and observe it.
+
+        Args:
+            location: The location of the child item within the tracking structure.
+            trackable_item: The child item to link.
+            sync_lock: Lock or unlock the child when the any-parent rule says its
+                state should differ (before the child is observed, so the entry is
+                not forwarded). Copy restoration leaves it False so lock state is
+                restored as data.
+
+        """
         held = self._tracking_acquire_for_link(trackable_item)
         try:
             self._tracking_child_tracked_items[trackable_item._tracking_uuid] = {
@@ -614,12 +678,13 @@ class TrackBase:
                 "item": trackable_item,
             }
             trackable_item._tracking_parents[self._tracking_uuid] = weakref.ref(self)
-            desired = trackable_item._tracking_any_parent_locks()
-            if desired != trackable_item._tracking_locked:
-                if desired:
-                    trackable_item.lock()
-                else:
-                    trackable_item.unlock()
+            if sync_lock:
+                desired = trackable_item._tracking_any_parent_locks()
+                if desired != trackable_item._tracking_locked:
+                    if desired:
+                        trackable_item.lock()
+                    else:
+                        trackable_item.unlock()
             trackable_item.tracking_add_observer(self._tracking_notify_observers, weak=True)
         finally:
             for lock in reversed(held):
@@ -825,6 +890,8 @@ class TrackBase:
 
         """
         with _TreeLockHold(self):
+            if trackable_item._tracking_uuid not in self._tracking_child_tracked_items:
+                return
             self._tracking_child_tracked_items.pop(trackable_item._tracking_uuid, None)
             trackable_item._tracking_parents.pop(self._tracking_uuid, None)
             trackable_item.tracking_remove_observer(self._tracking_notify_observers)
@@ -856,18 +923,86 @@ class TrackBase:
         for node in visited.values():
             node._tracking_tree_lock = fresh
 
+    def _tracking_copy_payload(self) -> Any:
+        """Return the container contents for a copy; the base has none.
+
+        Returns:
+            ``None`` here; containers return their items.
+
+        """
+        return None
+
+    def _tracking_restore_payload(self, payload: Any) -> None:
+        """Fill the container from ``_tracking_copy_payload`` output without tracking.
+
+        Args:
+            payload: What ``_tracking_copy_payload`` returned.
+
+        """
+
     def __getstate__(self) -> dict[str, Any]:
-        """Return the instance state without the tree lock, which cannot be copied."""
-        state = self.__dict__.copy()
-        state.pop("_tracking_tree_lock", None)
-        state.pop("_tracking_parents", None)
-        return state
+        """Return a portable state: attributes, contents and linked children.
+
+        Runtime identity and history (``_TRACKING_RUNTIME_KEYS``) are left out, and
+        mutable bookkeeping is shallow-copied so a copy never shares it. Only this
+        node is read under its tree lock.
+        """
+        with _TreeLockHold(self):
+            attributes: dict[str, Any] = {}
+            for key, value in self.__dict__.items():
+                if key in _TRACKING_RUNTIME_KEYS:
+                    continue
+                if key.startswith("_tracking_") and isinstance(value, list | set | dict):
+                    value = copy.copy(value)
+                attributes[key] = value
+            return {
+                "attributes": attributes,
+                "payload": self._tracking_copy_payload(),
+                "children": [
+                    (entry["location"], entry["item"])
+                    for entry in self._tracking_child_tracked_items.values()
+                ],
+            }
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Restore state and give the restored object a fresh tree lock."""
-        self._tracking_tree_lock = threading.RLock()
-        self._tracking_parents = {}
-        self.__dict__.update(state)
+        """Restore a state from ``__getstate__`` as an independent tracked object.
+
+        Gives the object a new uuid, fresh history (only its own ``init`` entry),
+        no observers and a fresh tree lock, links the restored children, and keeps
+        lock state as data (``lock()`` and ``unlock()`` are never called).
+        """
+        self.__dict__.update(state["attributes"])
+        self._tracking_reset_runtime_state()
+        self._tracking_restore_payload(state["payload"])
+        for location, child in state["children"]:
+            self._tracking_link_child(location, child)
+            if child._tracking_auto_converted_in is not None:
+                child._tracking_auto_converted_in = self._tracking_uuid
+        if self._tracking_record_init:
+            self.tracking_create_change(action="init", init_data=f"{self}")
+
+    def __reduce_ex__(self, _protocol: Any) -> tuple[Any, ...]:
+        """Pickle through ``_tracking_rebuild`` and ``__setstate__``, never replaying items.
+
+        ``pickle`` and ``copy`` pass the protocol positionally; every protocol gets
+        the same reduction.
+        """
+        return (_tracking_rebuild, (type(self),), self.__getstate__())
+
+    def __copy__(self) -> Any:
+        """Shallow copy: an independent tracked object sharing, not linking, children."""
+        clone = _tracking_rebuild(type(self))
+        state = self.__getstate__()
+        state["children"] = []
+        clone.__setstate__(state)
+        return clone
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> Any:
+        """Deep copy: an independent tracked object with copied, relinked children."""
+        clone = _tracking_rebuild(type(self))
+        memo[id(self)] = clone
+        clone.__setstate__(copy.deepcopy(self.__getstate__(), memo))
+        return clone
 
     def _tracking_present_child_locations(self) -> dict[str, Any]:
         """Map each trackable value still held to the location of its first occurrence.
