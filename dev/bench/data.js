@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793883261288,
+  "lastUpdate": 1793887613969,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -3483,6 +3483,149 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 9.201246188577448e-7",
             "extra": "mean: 11.114557375995531 usec\nrounds: 92713"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b3006627401505a7ec10ed0043e44a6ecee94bec",
+          "message": "feat: link already-tracked containers as children when stored (merges PR #89, addresses #67)\n\nOnly values a container converted itself were linked, so a TrackedDict or\nTrackedList built elsewhere and stored into another tracked container did\nnot forward its changes, inherit the lock state or join the tree lock.\n\nAny trackable value stored into a tracked container is now linked as a\nchild, whatever tracking_auto_convert is set to. A container may have\nseveral parents: each records the change with its own path. Linking two\ntrees merges them into one tree lock, permanently; a child unlinked from\nits last parent gets a fresh lock. A child is locked if any parent locks\nit. A value that would close a cycle is stored but not linked. An\nobserver that links two trees its thread already holds raises\nRuntimeError.\n\nRecords the design in ADR-0002 (amending ADR-0001) and documents the\nbehavior in docs/usage/basics.md and docs/usage/threading.md.\n\nBREAKING CHANGE: storing an already-tracked container links it as a child:\nits changes are forwarded to the new parent, it takes the parent's lock\nstate (locked if any parent is locked) and its tree merges into the\nparent's thread lock. To keep a container independent of the parent,\nstore x.copy() (a plain, untracked snapshot) or another plain value.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sceyzGx67XLdcr5dPL\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-05T14:05:51Z",
+          "tree_id": "74c6d0a24eb8009978942883aedbe8fb68be518f",
+          "url": "https://github.com/endavis/pydatatracker/commit/b3006627401505a7ec10ed0043e44a6ecee94bec"
+        },
+        "date": 1793887613565,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 591.818837449399,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004875904140040149",
+            "extra": "mean: 1.6897062694215117 msec\nrounds: 605"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 204.35647306117573,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00007953231918560561",
+            "extra": "mean: 4.893409956731061 msec\nrounds: 208"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 581.0444144271079,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00009321458535971593",
+            "extra": "mean: 1.7210388314049443 msec\nrounds: 605"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 614.1070268260129,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003132807424697145",
+            "extra": "mean: 1.6283806507938188 msec\nrounds: 630"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_capped",
+            "value": 603.6834311233979,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00008882426369150388",
+            "extra": "mean: 1.6564973435482475 msec\nrounds: 620"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[100]",
+            "value": 116105.36174617942,
+            "unit": "iter/sec",
+            "range": "stddev: 5.577722144150997e-7",
+            "extra": "mean: 8.612866666624086 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[1000]",
+            "value": 63013.56052020919,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000002340621233725404",
+            "extra": "mean: 15.86959999949992 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[10000]",
+            "value": 23770.152136751305,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001246176689396965",
+            "extra": "mean: 42.06956666692463 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[1000]",
+            "value": 85061.499464262,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000031253008946568093",
+            "extra": "mean: 11.756199999979344 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[10000]",
+            "value": 45583.630006191735,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004687605963289497",
+            "extra": "mean: 21.937700000288867 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[20000]",
+            "value": 25215.338994524747,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009526275607004204",
+            "extra": "mean: 39.65840000077492 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[1000]",
+            "value": 90562.21019809008,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000037018836458431137",
+            "extra": "mean: 11.04213333367928 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[10000]",
+            "value": 48909.162642737836,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004218203841841462",
+            "extra": "mean: 20.446066666579554 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[20000]",
+            "value": 23880.939189656197,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001150678088427347",
+            "extra": "mean: 41.87439999986017 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_monitored",
+            "value": 21650.81700435011,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000248232668762897",
+            "extra": "mean: 46.18763346432048 usec\nrounds: 22388"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_update",
+            "value": 102424.0180215363,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000021148083662163654",
+            "extra": "mean: 9.763335000094742 usec\nrounds: 200"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_declared",
+            "value": 70565.36659916764,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000011302821604656077",
+            "extra": "mean: 14.171257774090494 usec\nrounds: 73417"
           }
         ]
       }
