@@ -51,6 +51,9 @@ from ._trackbase import TrackBase, check_lock, merges_trees, track_changes
 if TYPE_CHECKING:
     from ..utils.changelog import ChangeLogEntry
 
+# Sentinel distinguishing "no default given" from an explicit ``default=None``.
+_MISSING: Any = object()
+
 
 class TrackedDict(TrackBase, dict):
     """A dictionary class that tracks changes to its items.
@@ -263,20 +266,22 @@ class TrackedDict(TrackBase, dict):
 
     @check_lock
     @track_changes
-    def pop(self, key: Hashable, default: Any | None = None) -> Any:
+    def pop(self, key: Hashable, default: Any = _MISSING) -> Any:
         """Remove and return the value for a specified key from the dictionary.
 
         This method removes the specified key from the dictionary and returns its
-        value. If the key is not found, the default value is returned. The removal
-        operation is tracked, and the tracking context is updated with details about
+        value. If the key is not found, ``default`` is returned when given;
+        otherwise ``KeyError`` is raised and no change entry is recorded. The
+        removal is tracked, and the tracking context is updated with details about
         the removed item.
 
         Args:
             key: The key to remove from the dictionary.
-            default: The value to return if the key is not found (default: None).
+            default: The value to return if the key is not found. When omitted,
+                a missing key raises ``KeyError``.
 
         Returns:
-            The value associated with the key if found, otherwise the default value.
+            The value associated with the key if found, otherwise ``default``.
 
         Raises:
             KeyError: If the key is not found and no default value is provided.
@@ -284,21 +289,19 @@ class TrackedDict(TrackBase, dict):
         Example:
             >>> tracked = TrackedDict({'a': 1, 'b': 2})
             >>> value = tracked.pop('a')  # Returns 1 and tracks removal
-            >>> value = tracked.pop('c', 3)  # Returns 3, no tracking update
+            >>> value = tracked.pop('c', 3)  # Returns the default 3
 
         """
-        value = "###^$^@$^$default###^$^@$^"
+        value = default
 
         if not self._tracking_locked:
-            value = super().pop(key, default)
-
-        if value != "###^$^@$^$default###^$^@$^":
+            value = super().pop(key) if default is _MISSING else super().pop(key, default)
             self._tracking_context.setdefault("removed_items", []).append(value)
             self._tracking_context["value"] = value
 
         self._tracking_context["action"] = "update"
         self._tracking_context["location"] = key
-        return value if value != "###^$^@$^$default###^$^@$^" else default
+        return value
 
     @check_lock
     @track_changes

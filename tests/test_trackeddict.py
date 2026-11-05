@@ -394,3 +394,37 @@ def test_dict_clear_unlinks_duplicated_child() -> None:
     parent, child = _duplicated()
     parent.clear()
     assert _forwarded(parent, child, "y") == 0
+
+
+def test_tracked_dict_pop_missing_key_raises_without_change_entry() -> None:
+    """pop(missing) raises KeyError like dict.pop and records nothing."""
+    tracked = TrackedDict({"a": 1})
+    before = len(tracked.tracking_changes())
+
+    with pytest.raises(KeyError):
+        tracked.pop("missing")
+
+    assert len(tracked.tracking_changes()) == before
+    assert dict(tracked) == {"a": 1}
+
+
+def test_tracked_dict_pop_missing_key_with_default_returns_default() -> None:
+    """pop(missing, default) returns the default, including an explicit None."""
+    tracked = TrackedDict({"a": 1})
+
+    assert tracked.pop("missing", "fallback") == "fallback"
+    assert tracked.pop("missing", None) is None
+    assert dict(tracked) == {"a": 1}
+
+
+def test_tracked_dict_pop_present_key_with_default_removes_and_logs() -> None:
+    """pop(present, default) removes the key and logs the removal."""
+    tracked = TrackedDict({"a": 1})
+
+    assert tracked.pop("a", 99) == 1
+
+    change = _latest_change(tracked)
+    assert change.extra["action"] == "update"
+    assert change.extra["location"] == "a"
+    assert change.extra["removed_items"] == "[1]"
+    assert "a" not in tracked
