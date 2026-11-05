@@ -70,7 +70,6 @@ class TrackedDict(TrackBase, dict):
         self,
         *args: Any,
         tracking_name: str | None = None,
-        tracking_auto_converted_in: str | None = None,
         tracking_auto_convert: bool = False,
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
@@ -89,35 +88,36 @@ class TrackedDict(TrackBase, dict):
         Args:
             *args: Positional arguments to initialize the dictionary.
             tracking_name: Optional name for tracking purposes.
-            tracking_auto_converted_in: Optional string for auto-conversion context.
             tracking_auto_convert: Boolean flag to enable/disable auto-conversion.
             tracking_parent: Optional parent tracking object.
             tracking_location: Optional string for tracking location context.
             tracking_record_init: Whether to record the ``init`` entry; None inherits.
             tracking_max_changes: Cap on stored change entries (oldest dropped); None
                 inherits from the parent, else unbounded.
-            **kwargs: Keyword arguments to initialize the dictionary.
+            **kwargs: Keyword arguments to initialize the dictionary. A key starting
+                with ``tracking_`` that is not a documented option raises ``TypeError``.
 
         """
+        reserved = sorted(key for key in kwargs if key.startswith("tracking_"))
+        if reserved:
+            msg = (
+                f"TrackedDict got unexpected tracking option(s) {reserved}. "
+                'Keyword keys starting with "tracking_" are reserved for options; '
+                'pass such data as a mapping instead, e.g. TrackedDict({"tracking_x": 1}).'
+            )
+            raise TypeError(msg)
         dict.__init__(self, *args, **kwargs)
-        tracking_kwargs: dict[str, Any] = {}
-        if tracking_capture_snapshots is not None:
-            tracking_kwargs["tracking_capture_snapshots"] = tracking_capture_snapshots
-        if tracking_capture_stack is not None:
-            tracking_kwargs["tracking_capture_stack"] = tracking_capture_stack
-        if tracking_record_init is not None:
-            tracking_kwargs["tracking_record_init"] = tracking_record_init
-        if tracking_max_changes is not None:
-            tracking_kwargs["tracking_max_changes"] = tracking_max_changes
         TrackBase.__init__(
             self,
-            tracking_auto_converted_in=tracking_auto_converted_in,
+            tracking_name=tracking_name,
             tracking_auto_convert=tracking_auto_convert,
             tracking_parent=tracking_parent,
             tracking_location=tracking_location,
-            tracking_name=tracking_name,
+            tracking_capture_snapshots=tracking_capture_snapshots,
+            tracking_capture_stack=tracking_capture_stack,
+            tracking_record_init=tracking_record_init,
+            tracking_max_changes=tracking_max_changes,
             tracking_delimiter=":",
-            **tracking_kwargs,
         )
 
     def _tracking_convert_all_values(self) -> None:

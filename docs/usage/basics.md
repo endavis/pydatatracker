@@ -181,6 +181,30 @@ their parent. `tracking_add_attribute_to_monitor` still records `start monitorin
 dynamic attributes. You may call it before the attribute is set: the name is registered at
 once and the first assignment records `start monitoring`, the same log as setting first.
 
+### Constructor options
+
+`TrackedDict`, `TrackedList` and `TrackedAttr` take the same keyword-only options with the same
+defaults. An unknown option raises `TypeError`, and options cannot be passed positionally.
+
+| Option | Type | Default | Inheritance |
+| --- | --- | --- | --- |
+| `tracking_name` | `str \| None` | `None` | Not inherited; read back with `tracking_name` |
+| `tracking_auto_convert` | `bool` | `False` | Not inherited |
+| `tracking_parent` | `TrackBase \| None` | `None` | Links this object under a parent |
+| `tracking_location` | `str \| None` | `""` | Location label under the parent |
+| `tracking_capture_snapshots` | `bool \| None` | `False` | `None` inherits from the parent |
+| `tracking_capture_stack` | `bool \| None` | `False` | `None` inherits from the parent |
+| `tracking_record_init` | `bool \| None` | class default | `None` inherits from the parent |
+| `tracking_max_changes` | `int \| None` | unbounded | `None` inherits from the parent |
+
+`tracking_created` is a read-only, timezone-aware UTC datetime. `TrackedAttr` exposes the first
+value of each monitored attribute through `tracking_get_original_value(name)`.
+
+`TrackedDict(a=1)` keeps keyword data. A keyword starting with `tracking_` that is not an option
+raises `TypeError`; store such a key with `TrackedDict({"tracking_x": 1})`.
+
+See [ADR-0004](../decisions/0004-tracked-containers-share-one-keyword-only-option-set.md).
+
 ### What auto-convert converts
 
 With `tracking_auto_convert=True`, a container converts only values whose exact type is `dict` or

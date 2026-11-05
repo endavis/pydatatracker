@@ -391,79 +391,76 @@ class TrackBase:
 
     def __init__(
         self,
+        *,
         tracking_name: str | None = None,
-        tracking_auto_converted_in: str | None = None,
         tracking_auto_convert: bool = False,
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
+        tracking_capture_snapshots: bool | None = None,
+        tracking_capture_stack: bool | None = None,
+        tracking_record_init: bool | None = None,
+        tracking_max_changes: int | None = None,
         tracking_delimiter: str = "+",
-        **kwargs: Any,
     ) -> None:
         """Initialize a new instance of the TrackBase class.
 
-        This constructor sets up the instance by initializing various attributes
-        related to tracking, including the tracking name, UUID, observers, and
-        context. It also establishes relationships with parent tracked items and
-        prepares the instance for monitoring changes.
+        All options are keyword-only and shared by ``TrackedDict``, ``TrackedList``
+        and ``TrackedAttr``. An unknown option raises ``TypeError``. See
+        ``docs/usage/basics.md#constructor-options``.
 
         Args:
-            tracking_name: The name used for tracking the instance.
-            tracking_auto_converted_in: The context in which automatic conversion
-                occurs.
-            tracking_auto_convert: Flag indicating whether to automatically convert
-                values.
+            tracking_name: An optional name for the instance, read back through
+                the ``tracking_name`` property.
+            tracking_auto_convert: Convert stored ``dict`` and ``list`` values to
+                tracked containers (default False).
             tracking_parent: An optional parent instance for establishing a hierarchy.
             tracking_location: The location of the tracked attribute.
-            tracking_delimiter: The delimiter used for tracking attribute locations.
-            **kwargs: Additional keyword arguments for further customization.
-                ``tracking_record_init`` controls whether the ``init`` change entry
-                (with the full ``init_data`` repr) is recorded. When omitted it is
-                inherited from ``tracking_parent``, else from the class default
+            tracking_capture_snapshots: Record before/after reprs. ``None`` inherits
+                from ``tracking_parent``, else False.
+            tracking_capture_stack: Record the call stack. ``None`` inherits from
+                ``tracking_parent``, else False.
+            tracking_record_init: Whether the ``init`` change entry (with the full
+                ``init_data`` repr) is recorded. ``None`` inherits from
+                ``tracking_parent``, else the class default
                 ``_tracking_record_init`` (True).
-                ``tracking_max_changes`` caps the change history at that many
-                entries (oldest dropped first); ``0`` keeps none. When omitted it
-                is inherited from ``tracking_parent``, else history is unbounded
-                (None). A child cannot pass None to lift a parent's cap. A
-                negative value raises ``ValueError``.
+            tracking_max_changes: Caps the change history at that many entries
+                (oldest dropped first); ``0`` keeps none. ``None`` inherits from
+                ``tracking_parent``, else history is unbounded. A child cannot pass
+                None to lift a parent's cap. A negative value raises ``ValueError``.
+            tracking_delimiter: The delimiter used for tracking attribute locations.
+                Set by each container type; not a container option.
 
         Returns:
             None
 
         """
         self._tracking_name = tracking_name
-        self._tracking_auto_converted_in = tracking_auto_converted_in
         self._tracking_locked = False
         self._tracking_auto_convert = tracking_auto_convert
         self._tracking_delimiter = tracking_delimiter
         self._tracking_debug_flag = False
-        self._tracking_capture_snapshots = kwargs.get("tracking_capture_snapshots", False)
-        self._tracking_capture_stack = kwargs.get("tracking_capture_stack", False)
+        snapshots = tracking_capture_snapshots
+        stack = tracking_capture_stack
+        max_changes = tracking_max_changes
         if tracking_parent is not None:
-            self._tracking_capture_snapshots = getattr(
-                tracking_parent, "_tracking_capture_snapshots", False
-            )
-            self._tracking_capture_stack = getattr(
-                tracking_parent, "_tracking_capture_stack", False
-            )
+            if snapshots is None:
+                snapshots = getattr(tracking_parent, "_tracking_capture_snapshots", False)
+            if stack is None:
+                stack = getattr(tracking_parent, "_tracking_capture_stack", False)
             self._tracking_record_init = getattr(
                 tracking_parent, "_tracking_record_init", type(self)._tracking_record_init
             )
-        if kwargs.get("tracking_record_init") is not None:
-            self._tracking_record_init = kwargs["tracking_record_init"]
-        max_changes: int | None = None
-        if tracking_parent is not None:
-            max_changes = getattr(tracking_parent, "_tracking_max_changes", None)
-        if kwargs.get("tracking_max_changes") is not None:
-            max_changes = kwargs["tracking_max_changes"]
+            if max_changes is None:
+                max_changes = getattr(tracking_parent, "_tracking_max_changes", None)
+        self._tracking_capture_snapshots = bool(snapshots)
+        self._tracking_capture_stack = bool(stack)
+        if tracking_record_init is not None:
+            self._tracking_record_init = tracking_record_init
         if max_changes is not None and max_changes < 0:
             msg = f"tracking_max_changes must be >= 0 or None, got {max_changes}"
             raise ValueError(msg)
         self._tracking_max_changes = max_changes
         self._tracking_reset_runtime_state()
-        if "tracking_capture_snapshots" in kwargs:
-            self._tracking_capture_snapshots = kwargs["tracking_capture_snapshots"]
-        if "tracking_capture_stack" in kwargs:
-            self._tracking_capture_stack = kwargs["tracking_capture_stack"]
         if self._tracking_record_init:
             self.tracking_create_change(action="init", init_data=f"{self}")
         self._tracking_convert_all_values()
@@ -471,6 +468,16 @@ class TrackBase:
         # construction entries.
         if tracking_parent is not None:
             tracking_parent._tracking_add_child_tracked_item(tracking_location, self)
+
+    @property
+    def tracking_name(self) -> str | None:
+        """The name given at construction, or None. Read-only."""
+        return self._tracking_name
+
+    @property
+    def tracking_created(self) -> datetime.datetime:
+        """When this object was created, as a timezone-aware UTC datetime. Read-only."""
+        return self._tracking_created
 
     def _tracking_reset_runtime_state(self) -> None:
         """Create the per-object runtime state: lock, identity, observers and history.
@@ -515,7 +522,6 @@ class TrackBase:
         if hasattr(self, "_tracking_auto_convert") and self._tracking_auto_convert:
             value = self._tracking_convert_to_trackable(
                 value,
-                tracking_auto_converted_in=self._tracking_uuid,
                 tracking_auto_convert=self._tracking_auto_convert,
                 tracking_parent=self,
                 tracking_location=location,
@@ -1002,8 +1008,6 @@ class TrackBase:
         self._tracking_restore_payload(state["payload"])
         for location, child in state["children"]:
             self._tracking_link_child(location, child)
-            if child._tracking_auto_converted_in is not None:
-                child._tracking_auto_converted_in = self._tracking_uuid
         if self._tracking_record_init:
             self.tracking_create_change(action="init", init_data=f"{self}")
 
@@ -1387,7 +1391,6 @@ class TrackBase:
     def _tracking_convert_to_trackable(
         self,
         obj: Any,
-        tracking_auto_converted_in: str | None = None,
         tracking_auto_convert: bool = False,
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
@@ -1403,8 +1406,6 @@ class TrackBase:
 
         Args:
             obj: The object to be converted to a trackable type.
-            tracking_auto_converted_in: The context in which automatic conversion
-            occurs.
             tracking_auto_convert: Flag indicating whether to automatically convert
             values.
             tracking_parent: An optional parent instance for establishing a hierarchy.
@@ -1420,7 +1421,6 @@ class TrackBase:
 
             return TrackedDict(
                 obj,
-                tracking_auto_converted_in=tracking_auto_converted_in,
                 tracking_auto_convert=tracking_auto_convert or False,
                 tracking_parent=tracking_parent,
                 tracking_location=tracking_location,
@@ -1430,7 +1430,6 @@ class TrackBase:
 
             return TrackedList(
                 obj,
-                tracking_auto_converted_in=tracking_auto_converted_in,
                 tracking_auto_convert=tracking_auto_convert or False,
                 tracking_parent=tracking_parent,
                 tracking_location=tracking_location,

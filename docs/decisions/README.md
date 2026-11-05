@@ -149,3 +149,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0001](0001-tracked-containers-serialize-mutations-with-a-tree-wide-rlock.md) | Tracked containers serialize mutations with a tree-wide RLock | Accepted |
 | [0002](0002-copies-of-tracked-containers-are-independent-tracked-objects-with-fresh-history.md) | Copies of tracked containers are independent tracked objects with fresh history | Accepted |
 | [0003](0003-linking-a-tracked-container-merges-tree-locks.md) | Linking a tracked container merges tree locks | Accepted |
+| [0004](0004-tracked-containers-share-one-keyword-only-option-set.md) | Tracked containers share one keyword-only option set | Accepted |
