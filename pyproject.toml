@@ -294,6 +294,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_convert_item_hook.py",
     "tests/test_copy_semantics.py",
     "tests/test_exporters.py",
+    "tests/test_list_uuid_tree_equal_items.py",
     "tests/test_lock_acquisitions.py",
     "tests/test_noop_changes.py",
     "tests/test_observer_errors.py",
