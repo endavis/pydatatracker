@@ -358,7 +358,7 @@ class TrackedList(TrackBase, list):
     @merges_trees
     @check_lock
     @track_changes
-    def extend(self, items: list) -> None:
+    def extend(self, items: Iterable) -> None:
         """Extend the tracked list with items from another list.
 
         This method extends the tracked list by appending items from another list,
@@ -366,7 +366,8 @@ class TrackedList(TrackBase, list):
         tracking context with the action details.
 
         Args:
-            items: The list of items to extend the tracked list with.
+            items: The iterable of items to extend the tracked list with. It is
+                consumed once; the change log records the stored values.
 
         Example:
             >>> tracked_list = TrackedList([1, 2, 3])
@@ -374,6 +375,7 @@ class TrackedList(TrackBase, list):
             >>> tracked_list.extend(['a', 'b'])  # Extend is tracked
 
         """
+        items = list(items)
         if not self._tracking_locked:
             count = len(self)
             new_data = self._tracking_store_items(
@@ -390,7 +392,7 @@ class TrackedList(TrackBase, list):
         location = ",".join(locations)
 
         self._tracking_context["action"] = "add"
-        self._tracking_context["value"] = items
+        self._tracking_context["value"] = new_data
         self._tracking_context["location"] = location
 
     def __iadd__(self, other: Iterable) -> Self:  # type: ignore[misc]
