@@ -50,6 +50,40 @@ def test_tracked_list_extend_logs_location_range() -> None:
     assert "[3, 4]" in change.extra["value"]
 
 
+def test_tracked_list_extend_generator_logs_stored_values() -> None:
+    """Extending from a generator logs the stored values, not the exhausted generator."""
+    tracked = TrackedList([9])
+
+    tracked.extend(i for i in range(3))
+
+    change = _latest_change(tracked)
+    assert list(tracked) == [9, 0, 1, 2]
+    assert change.extra["location"] == "1,2,3"
+    assert "[0, 1, 2]" in str(change.extra["value"])
+
+
+def test_tracked_list_extend_logs_converted_values() -> None:
+    """With auto-convert on, the logged values are the converted stored items."""
+    tracked = TrackedList(tracking_auto_convert=True)
+
+    tracked.extend(x for x in [{"a": 1}])
+
+    change = _latest_change(tracked)
+    assert isinstance(tracked[0], TrackedDict)
+    assert change.extra["value"] == "[{'a': 1}]"
+
+
+def test_locked_tracked_list_extend_generator_raises_without_mutation() -> None:
+    """A locked list rejects a generator extend and stays unchanged."""
+    tracked = TrackedList([1])
+    tracked.lock()
+
+    with pytest.raises(RuntimeError):
+        tracked.extend(i for i in range(2))
+
+    assert list(tracked) == [1]
+
+
 def test_tracked_list_remove_reports_removed_items() -> None:
     """Removing an item should capture location and removed payload."""
     tracked = TrackedList(["a", "b", "c"])
