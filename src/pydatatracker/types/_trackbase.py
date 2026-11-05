@@ -49,7 +49,7 @@ import logging
 import threading
 import weakref
 from collections import deque
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from functools import wraps
 from typing import Any, Literal
 from uuid import uuid4
@@ -58,6 +58,9 @@ from uuid import uuid4
 # Project
 from ..utils.changelog import ChangeLogEntry
 from .actor import current_actor
+
+# Argument types that can never hold a tracked value; the pre-merge scan skips them.
+_SCALAR_TYPES: frozenset[type] = frozenset({int, str, float, bool, bytes, type(None)})
 
 # Resolved on first use: the tracked types import this module, so they cannot
 # be imported at module level here.
@@ -73,6 +76,68 @@ def _load_trackable_classes() -> tuple[type, type, type]:
 
     _trackable_classes = (TrackedDict, TrackedList, TrackedAttr)
     return _trackable_classes
+
+
+def _lock_owned(lock: Any) -> bool:
+    """Return True if the calling thread holds the given ``RLock``.
+
+    Relies on ``RLock._is_owned``, which CPython provides on every supported
+    version; ``tests/test_thread_safety.py`` pins that it exists.
+    """
+    return bool(lock._is_owned())
+
+
+def _acquire_node_lock(node: Any) -> Any:
+    """Acquire ``node``'s current tree lock and return the lock object held.
+
+    A merge can swap a node's lock while this thread waits on the old one, so
+    the lock is re-read after acquiring and the acquire is retried if it moved.
+    The caller must release the returned object, not ``node._tracking_tree_lock``.
+    """
+    while True:
+        lock = node._tracking_tree_lock
+        lock.acquire()
+        if node._tracking_tree_lock is lock:
+            return lock
+        lock.release()
+
+
+class _TreeLockHold:
+    """Context manager holding a node's tree lock with the acquire-and-recheck rule."""
+
+    __slots__ = ("_lock", "_node")
+
+    def __init__(self, node: Any) -> None:
+        self._node = node
+        self._lock: Any = None
+
+    def __enter__(self) -> None:
+        self._lock = _acquire_node_lock(self._node)
+
+    def __exit__(self, *exc: object) -> None:
+        self._lock.release()
+
+
+def merges_trees(method: Callable[..., Any]) -> Callable[..., Any]:
+    """Merge the tree locks of already-tracked arguments into the instance's before storing.
+
+    Place this outermost, above ``check_lock``. Merging before the instance's lock
+    is taken means no thread ever has to take two tree locks while holding one.
+
+    Args:
+        method: The storing mutator to decorate.
+
+    Returns:
+        The wrapped method.
+
+    """
+
+    @wraps(method)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        self._tracking_premerge(args, kwargs)
+        return method(self, *args, **kwargs)
+
+    return wrapper
 
 
 def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
@@ -113,10 +178,13 @@ def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
             if getattr(self, "_tracking_locked", False):
                 raise RuntimeError(f"{self.__class__.__name__} is locked and cannot be modified.")
             return method(self, *args, **kwargs)
-        with lock:
+        held = _acquire_node_lock(self)
+        try:
             if self._tracking_locked:
                 raise RuntimeError(f"{self.__class__.__name__} is locked and cannot be modified.")
             return method(self, *args, **kwargs)
+        finally:
+            held.release()
 
     return wrapper
 
@@ -155,7 +223,7 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
             The result of the method execution.
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             # reset the tracking context
             data_pre_change = None
             if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in [
@@ -249,6 +317,7 @@ _TRACKING_RUNTIME_KEYS: frozenset[str] = frozenset(
         "_tracking_changes",
         "_tracking_created",
         "_tracking_child_tracked_items",
+        "_tracking_parents",
     }
 )
 """Instance attributes that are runtime identity and history, never copied or pickled."""
@@ -281,7 +350,8 @@ class TrackBase:
 
     Thread safety: every tree of tracked containers shares one
     ``threading.RLock`` that is held for the whole of each mutating call, so
-    concurrent mutation of one tree is serialised. Reads are not locked. See
+    concurrent mutation of one tree is serialised. Linking a tracked container
+    into another tree merges the two trees onto one lock. Reads are not locked. See
     ``docs/usage/threading.md``.
 
     Copy semantics: ``copy.copy``, ``copy.deepcopy`` and ``pickle`` build an
@@ -391,6 +461,9 @@ class TrackBase:
         self._tracking_change_uuids: set[str] = set()
         self._tracking_created = datetime.datetime.now()
         self._tracking_child_tracked_items: dict[str, Any] = {}
+        # Live parents by uuid. A child can have several, so lock state and
+        # lock merging look at all of them.
+        self._tracking_parents: dict[str, weakref.ref[TrackBase]] = {}
         max_changes = self._tracking_max_changes
         self._tracking_changes: list[ChangeLogEntry] | deque[ChangeLogEntry] = (
             [] if max_changes is None else deque(maxlen=max_changes)
@@ -448,10 +521,13 @@ class TrackBase:
         return self._tracking_convert_value(value, location)
 
     def _tracking_store_item(self, value: Any, location: Any = "") -> Any:
-        """Run the conversion hook and link a newly created trackable result as a child.
+        """Run the conversion hook and link the trackable result as a child.
 
-        A result that is the input object (already tracked) or already a child is not
-        linked, so default behavior is unchanged.
+        Any trackable result (``TrackedDict``, ``TrackedList``, ``TrackedAttr``) that
+        is not already a child is linked, whether this container created it or it was
+        built elsewhere, and whatever ``tracking_auto_convert`` is set to. A result
+        that is already a child is left alone (the #39 duplicate handling), and so is
+        one that would close a cycle: it is stored but not linked.
 
         Args:
             value: The value being stored.
@@ -462,19 +538,50 @@ class TrackBase:
 
         """
         converted = self._tracking_convert_item(value, location)
-        if (
-            converted is not value
-            and self._tracking_is_trackable(converted)
-            and converted._tracking_uuid not in self._tracking_child_tracked_items
-        ):
-            self._tracking_add_child_tracked_item(location, converted)
+        self._tracking_link_stored_value(converted, location)
         return converted
+
+    def _tracking_link_stored_value(self, value: Any, location: Any) -> None:
+        """Link ``value`` as a child unless it is untrackable, already a child or closes a cycle.
+
+        Args:
+            value: The stored value.
+            location: The index, key or attribute name it is stored at.
+
+        """
+        if value.__class__ in _SCALAR_TYPES or not self._tracking_is_trackable(value):
+            return
+        if value._tracking_uuid in self._tracking_child_tracked_items:
+            return
+        if value is self or value._tracking_reaches(self):
+            return
+        self._tracking_add_child_tracked_item(location, value)
+
+    def _tracking_reaches(self, target: "TrackBase") -> bool:
+        """Return True if ``target`` is this item or in its child subtree.
+
+        Args:
+            target: The item to look for.
+
+        """
+        visited: set[int] = set()
+        stack: list[TrackBase] = [self]
+        while stack:
+            node = stack.pop()
+            if node is target:
+                return True
+            if id(node) in visited:
+                continue
+            visited.add(id(node))
+            stack.extend(entry["item"] for entry in node._tracking_child_tracked_items.values())
+        return False
 
     def _tracking_store_items(self, pairs: Iterable[tuple[Any, Any]]) -> list[Any]:
         """Store several ``(value, location)`` pairs, undoing child links on failure.
 
         If the hook raises part way, every child linked since the call began is
-        unlinked and the exception is re-raised.
+        unlinked, a pre-built child gets its lock state back, and the exception is
+        re-raised.
 
         Args:
             pairs: The ``(value, location)`` pairs to convert.
@@ -484,9 +591,16 @@ class TrackBase:
 
         """
         before = set(self._tracking_child_tracked_items)
+        saved_lock_state: list[tuple[Any, bool]] = []
         converted: list[Any] = []
         try:
             for value, location in pairs:
+                if (
+                    value.__class__ not in _SCALAR_TYPES
+                    and self._tracking_is_trackable(value)
+                    and value._tracking_uuid not in self._tracking_child_tracked_items
+                ):
+                    saved_lock_state.append((value, value._tracking_locked))
                 converted.append(self._tracking_store_item(value, location))
         except BaseException:
             for uuid in list(self._tracking_child_tracked_items):
@@ -494,6 +608,12 @@ class TrackBase:
                     self._tracking_remove_child_tracked_item(
                         self._tracking_child_tracked_items[uuid]["item"]
                     )
+            for child, was_locked in saved_lock_state:
+                if child._tracking_locked != was_locked:
+                    if was_locked:
+                        child.lock()
+                    else:
+                        child.unlock()
             raise
         return converted
 
@@ -520,10 +640,12 @@ class TrackBase:
         """Add a child tracked item to the current instance.
 
         This method registers a specified child tracked item within the tracking
-        structure, allowing it to be monitored for changes. It also ensures that
-        the child item inherits the lock state of the parent (the child is only
-        locked or unlocked when its state differs, so a matching child records
-        nothing) and adds the parent as an observer to the child item.
+        structure, allowing it to be monitored for changes. The child's tree lock is
+        merged with this instance's (see ``_tracking_acquire_for_link``). It also
+        ensures that the child item inherits the lock state of its parents: it is
+        locked when any parent locks it, and only locked or unlocked when its state
+        differs, so a matching child records nothing. The parent is added as an
+        observer to the child item.
 
         Args:
             location: The location of the child item within the tracking structure.
@@ -538,28 +660,217 @@ class TrackBase:
     def _tracking_link_child(
         self, location: str | None, trackable_item: "TrackBase", sync_lock: bool = False
     ) -> None:
-        """Register a child, share the tree lock and observe it.
+        """Register a child, merge its tree lock with this one and observe it.
 
         Args:
             location: The location of the child item within the tracking structure.
             trackable_item: The child item to link.
-            sync_lock: Lock or unlock the child to match this item when they differ
-                (before the child is observed, so the entry is not forwarded). Copy
-                restoration leaves it False so lock state is restored as data.
+            sync_lock: Lock or unlock the child when the any-parent rule says its
+                state should differ (before the child is observed, so the entry is
+                not forwarded). Copy restoration leaves it False so lock state is
+                restored as data.
 
         """
-        with self._tracking_tree_lock:
+        held = self._tracking_acquire_for_link(trackable_item)
+        try:
             self._tracking_child_tracked_items[trackable_item._tracking_uuid] = {
                 "location": location,
                 "item": trackable_item,
             }
-            trackable_item._tracking_adopt_tree_lock(self._tracking_tree_lock)
-            if sync_lock and self._tracking_locked != trackable_item._tracking_locked:
-                if self._tracking_locked:
-                    trackable_item.lock()
-                else:
-                    trackable_item.unlock()
+            trackable_item._tracking_parents[self._tracking_uuid] = weakref.ref(self)
+            if sync_lock:
+                desired = trackable_item._tracking_any_parent_locks()
+                if desired != trackable_item._tracking_locked:
+                    if desired:
+                        trackable_item.lock()
+                    else:
+                        trackable_item.unlock()
             trackable_item.tracking_add_observer(self._tracking_notify_observers, weak=True)
+        finally:
+            for lock in reversed(held):
+                lock.release()
+
+    def _tracking_acquire_for_link(self, child: "TrackBase") -> list[Any]:
+        """Hold the locks needed to link ``child`` here and merge their trees into one.
+
+        Which lock survives depends on which this thread already holds, so the lock
+        the caller is inside of stays valid. Returns the locks to release, in
+        acquire order.
+
+        Raises:
+            RuntimeError: This thread is already inside both trees (for example an
+                observer of one tree storing one of its nodes into the other).
+                Nothing is linked.
+
+        """
+        while True:
+            parent_lock = self._tracking_tree_lock
+            child_lock = child._tracking_tree_lock
+            if parent_lock is child_lock:
+                parent_lock.acquire()
+                if (
+                    self._tracking_tree_lock is parent_lock
+                    and child._tracking_tree_lock is parent_lock
+                ):
+                    return [parent_lock]
+                parent_lock.release()
+                continue
+            parent_owned = _lock_owned(parent_lock)
+            child_owned = _lock_owned(child_lock)
+            if parent_owned and child_owned:
+                raise RuntimeError(
+                    "Cannot link a tracked container while this thread is mutating both "
+                    "trees: an observer of one tree stored one of its nodes into the other."
+                )
+            if parent_owned:
+                order = [parent_lock, child_lock]
+            elif child_owned:
+                order = [child_lock, parent_lock]
+            else:
+                order = sorted((parent_lock, child_lock), key=id)
+            for lock in order:
+                lock.acquire()
+            if self._tracking_tree_lock is parent_lock and child._tracking_tree_lock is child_lock:
+                if child_owned:
+                    self._tracking_join_component(self, child_lock)
+                else:
+                    self._tracking_join_component(child, parent_lock)
+                return order
+            for lock in reversed(order):
+                lock.release()
+
+    @staticmethod
+    def _tracking_join_component(start: "TrackBase", winner: Any) -> None:
+        """Give ``winner`` to every node connected to ``start`` that shares its lock.
+
+        Walks children and live parents. Callers hold both the lock being replaced
+        and ``winner``, so no other thread holds a lock that is about to change.
+
+        Args:
+            start: The node whose connected tree is moved onto ``winner``.
+            winner: The lock the whole component ends up sharing.
+
+        """
+        loser = start._tracking_tree_lock
+        if loser is winner:
+            return
+        visited: set[int] = set()
+        stack: list[TrackBase] = [start]
+        while stack:
+            node = stack.pop()
+            if id(node) in visited or node._tracking_tree_lock is not loser:
+                continue
+            visited.add(id(node))
+            node._tracking_tree_lock = winner
+            stack.extend(entry["item"] for entry in node._tracking_child_tracked_items.values())
+            stack.extend(node._tracking_live_parents())
+
+    def _tracking_live_parents(self) -> list["TrackBase"]:
+        """Return the parents still alive, pruning dead references."""
+        parents: list[TrackBase] = []
+        for uuid, ref in list(self._tracking_parents.items()):
+            parent = ref()
+            if parent is None:
+                self._tracking_parents.pop(uuid, None)
+            else:
+                parents.append(parent)
+        return parents
+
+    def _tracking_locks_child(self, child: "TrackBase") -> bool:
+        """Return True if this parent wants ``child`` to be locked.
+
+        Args:
+            child: One of this instance's children.
+
+        """
+        return self._tracking_locked
+
+    def _tracking_any_parent_locks(self) -> bool:
+        """Return True if any live parent locks this item."""
+        return any(parent._tracking_locks_child(self) for parent in self._tracking_live_parents())
+
+    def _tracking_premerge(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
+        """Merge the tree locks of already-tracked values in a call's arguments into this one.
+
+        Looks at the arguments, the values of a mapping, the elements of a list or
+        tuple and, with ``tracking_auto_convert`` on, inside plain dicts and lists.
+        Never consumes an iterator; a store this misses is merged by
+        ``_tracking_acquire_for_link``. A merge for a value the hook later rejects
+        is kept, which only costs parallelism.
+
+        Args:
+            args: The positional arguments of the mutator.
+            kwargs: Its keyword arguments.
+
+        """
+        lock = getattr(self, "_tracking_tree_lock", None)
+        if lock is None:
+            return
+        foreign: list[TrackBase] = []
+        seen: set[int] = set()
+        for arg in args:
+            if arg.__class__ not in _SCALAR_TYPES:
+                self._tracking_scan_foreign(arg, True, lock, foreign, seen)
+        for arg in kwargs.values():
+            if arg.__class__ not in _SCALAR_TYPES:
+                self._tracking_scan_foreign(arg, True, lock, foreign, seen)
+        if not foreign:
+            return
+        while True:
+            mine = self._tracking_tree_lock
+            others = [node._tracking_tree_lock for node in foreign]
+            locks = {id(item): item for item in [mine, *others]}
+            if any(_lock_owned(item) for item in locks.values()):
+                return
+            order = sorted(locks.values(), key=id)
+            for item in order:
+                item.acquire()
+            try:
+                if self._tracking_tree_lock is mine and all(
+                    node._tracking_tree_lock is seen_lock
+                    for node, seen_lock in zip(foreign, others, strict=True)
+                ):
+                    for node in foreign:
+                        self._tracking_join_component(node, mine)
+                    return
+            finally:
+                for item in reversed(order):
+                    item.release()
+
+    def _tracking_scan_foreign(
+        self,
+        value: object,
+        top: bool,
+        lock: Any,
+        foreign: list["TrackBase"],
+        seen: set[int],
+    ) -> None:
+        """Collect trackable values under ``value`` whose tree lock is not ``lock``.
+
+        Args:
+            value: An argument, or something found inside one.
+            top: True for a direct argument, whose containers are always scanned.
+            lock: The lock of the instance being mutated.
+            foreign: Receives the values found.
+            seen: Ids of the plain containers already scanned.
+
+        """
+        if isinstance(value, TrackBase):
+            if self._tracking_is_trackable(value) and value._tracking_tree_lock is not lock:
+                foreign.append(value)
+            return
+        if not (top or self._tracking_auto_convert) or id(value) in seen:
+            return
+        if isinstance(value, Mapping):
+            seen.add(id(value))
+            for item in list(value.values()):
+                if item.__class__ not in _SCALAR_TYPES:
+                    self._tracking_scan_foreign(item, False, lock, foreign, seen)
+        elif isinstance(value, list | tuple):
+            seen.add(id(value))
+            for item in value:
+                if item.__class__ not in _SCALAR_TYPES:
+                    self._tracking_scan_foreign(item, False, lock, foreign, seen)
 
     def _tracking_remove_child_tracked_item(self, trackable_item: "TrackBase") -> None:
         """Remove a child tracked item from the current instance.
@@ -567,7 +878,9 @@ class TrackBase:
         This method unregisters a specified child tracked item from the tracking
         structure, ensuring that it is no longer monitored for changes. It also
         removes the parent as an observer from the child item, breaking the
-        relationship between the parent and child in the tracking system.
+        relationship between the parent and child in the tracking system. A child
+        that still has another parent keeps its lock. One left with none, and cut
+        off from this instance, gets a fresh lock with whatever is connected to it.
 
         Args:
             trackable_item: The child item to be removed from the tracking structure.
@@ -576,29 +889,39 @@ class TrackBase:
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             if trackable_item._tracking_uuid not in self._tracking_child_tracked_items:
                 return
             self._tracking_child_tracked_items.pop(trackable_item._tracking_uuid, None)
+            trackable_item._tracking_parents.pop(self._tracking_uuid, None)
             trackable_item.tracking_remove_observer(self._tracking_notify_observers)
-            trackable_item._tracking_adopt_tree_lock(threading.RLock())
+            if not trackable_item._tracking_live_parents():
+                trackable_item._tracking_detach_lock(self)
 
-    def _tracking_adopt_tree_lock(self, lock: threading.RLock) -> None:
-        """Make this item and all its descendants use the given tree lock.
+    def _tracking_detach_lock(self, old_parent: "TrackBase") -> None:
+        """Move what is connected to this item onto one fresh lock.
+
+        Does nothing if the walk reaches ``old_parent``: the item is still connected
+        to it through a shared descendant, so the tree stays whole.
 
         Args:
-            lock: The lock of the tree this item now belongs to.
+            old_parent: The parent this item was just unlinked from.
 
         """
-        visited: set[int] = set()
+        visited: dict[int, TrackBase] = {}
         stack: list[TrackBase] = [self]
         while stack:
             node = stack.pop()
+            if node is old_parent:
+                return
             if id(node) in visited:
                 continue
-            visited.add(id(node))
-            node._tracking_tree_lock = lock
+            visited[id(node)] = node
             stack.extend(entry["item"] for entry in node._tracking_child_tracked_items.values())
+            stack.extend(node._tracking_live_parents())
+        fresh = threading.RLock()
+        for node in visited.values():
+            node._tracking_tree_lock = fresh
 
     def _tracking_copy_payload(self) -> Any:
         """Return the container contents for a copy; the base has none.
@@ -624,7 +947,7 @@ class TrackBase:
         mutable bookkeeping is shallow-copied so a copy never shares it. Only this
         node is read under its tree lock.
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             attributes: dict[str, Any] = {}
             for key, value in self.__dict__.items():
                 if key in _TRACKING_RUNTIME_KEYS:
@@ -743,7 +1066,7 @@ class TrackBase:
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             entries = self._tracking_observers.setdefault(priority, [])
             if observer == self._tracking_notify_observers:
                 return
@@ -764,7 +1087,7 @@ class TrackBase:
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             for priority, entries in self._tracking_observers.items():
                 self._tracking_observers[priority] = [
                     entry for entry in entries if entry.alive() and not entry.matches(observer)
@@ -881,7 +1204,7 @@ class TrackBase:
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             if "locked" not in kwargs:
                 kwargs["locked"] = self._tracking_locked
             if "type" not in kwargs:
@@ -967,7 +1290,7 @@ class TrackBase:
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             self._tracking_locked = True
             for key in self._tracking_child_tracked_items:
                 self._tracking_child_tracked_items[key]["item"].lock()
@@ -987,10 +1310,12 @@ class TrackBase:
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             self._tracking_locked = False
             for key in self._tracking_child_tracked_items:
-                self._tracking_child_tracked_items[key]["item"].unlock()
+                child = self._tracking_child_tracked_items[key]["item"]
+                if not child._tracking_any_parent_locks():
+                    child.unlock()
             self.tracking_create_change(action="unlock")
 
     def tracking_get_formatted_updates(self) -> list[str]:

@@ -454,15 +454,24 @@ def test_attr_delete_unmonitored_attribute_and_shared_child() -> None:
     assert _latest_change(holder).extra["location"] == "child:s"
 
 
-def test_attr_already_tracked_dict_is_not_linked_and_overwrite_is_safe() -> None:
+def test_attr_already_tracked_dict_is_linked_and_overwrite_unlinks_it() -> None:
     holder = Holder()
     tracked = TrackedDict({"a": 1})
 
     holder.other = tracked
-    assert tracked._tracking_uuid not in holder._tracking_child_tracked_items
+    assert tracked._tracking_uuid in holder._tracking_child_tracked_items
+    assert tracked._tracking_tree_lock is holder._tracking_tree_lock
+    tracked["a"] = 2
+    assert _latest_change(holder).extra["location"] == "other:a"
+
     holder.other = 5
 
     assert holder.other == 5
+    assert tracked._tracking_uuid not in holder._tracking_child_tracked_items
+    assert tracked._tracking_tree_lock is not holder._tracking_tree_lock
+    before = len(holder.tracking_changes())
+    tracked["a"] = 3
+    assert len(holder.tracking_changes()) == before
 
 
 def test_attr_declared_field_overwrite_unlinks_child() -> None:
