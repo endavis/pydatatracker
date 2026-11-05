@@ -282,6 +282,10 @@ in JSON and loaded with `pydatatracker.config.load_observers_from_json`.
 Builders in `pydatatracker.exporters` (`JsonLinesExporter`, `HttpExporter`, `S3Exporter`,
 `KafkaExporter`) stream serialized change dicts to external systems.
 
+Exporters run inline in the mutating call, and config files that name callables by dotted path
+run code when loaded; see [Observers and exporters run inline](debugging.md#observers-and-exporters-run-inline)
+and [Config files are trusted code](debugging.md#config-files-are-trusted-code).
+
 ### Demo scripts
 
 - `uv run python scripts/cli.py demo` writes a tracked change to stdout.
