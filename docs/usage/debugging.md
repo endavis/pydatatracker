@@ -121,3 +121,73 @@ Combine observers with exporters (e.g., `JsonLinesExporter`, `HttpExporter`) to 
 ]
 ```
 Load via `load_observers_from_json` and attach to tracked objects.
+
+### Config files are trusted code
+`load_observers_from_json` passes each entry to `build_observer_from_config`. For `http_exporter`
+(`options.post_callable`), `s3_exporter` (`options.client_callable`) and `kafka_exporter`
+(`options.producer_callable`), the dotted path from the config is imported with `import_module`
+and `getattr`. Importing a module runs its top-level code. For `s3_exporter` and `kafka_exporter`
+the resolved callable is also called while the config loads (the client or producer factory); the
+`http_exporter` post callable is called on every export. Loading a config can therefore run
+arbitrary code with your process's privileges.
+
+There is no allowlist or validation of the path. Load only config files you wrote or control, never
+one built from user input or stored where others can write. `change_collector`, `filtered` and
+`logging` do not import by path; `json_file` and `json_lines_exporter` do not either, but they
+append to the file path named in the config.
+
+### Observers and exporters run inline
+Observers, including `json_file_observer` and every exporter, run synchronously inside the
+mutating call, in priority order, while the tree lock is held (see
+[Threading — Observers](threading.md#observers)). A slow sink slows every write to that tree and
+blocks other threads mutating it.
+
+- `json_file_observer` creates the parent directory, then opens, appends and closes the file for
+  every event. `JsonLinesExporter` creates the directory once in its constructor, then opens,
+  appends and closes per event.
+- `HttpExporter` makes a blocking `post` per event, `S3Exporter` a `put_object` per event and
+  `KafkaExporter` a `producer.send` per event.
+- An exception from an observer or exporter is raised from the mutation call, after the write is
+  committed and every other observer has run (see
+  [Observers](basics.md#observers)). A network error in an exporter raises from `d["a"] = 1`
+  even though the write happened.
+
+For a slow sink, have the observer only enqueue the change dictionary and export it from a worker
+thread:
+
+```python
+import queue
+import threading
+
+from pydatatracker import TrackedDict
+from pydatatracker.exporters import JsonLinesExporter
+
+exporter = JsonLinesExporter("changes.jsonl")
+events: queue.Queue[dict[str, object] | None] = queue.Queue()  # unbounded: put never blocks
+
+
+def worker() -> None:
+    while (item := events.get()) is not None:
+        try:
+            exporter.export(item)
+        except Exception as exc:  # nothing else will see this
+            print(f"export failed: {exc!r}")
+
+
+thread = threading.Thread(target=worker, name="change-exporter")
+thread.start()
+
+tracked = TrackedDict()
+tracked.tracking_add_observer(lambda change: events.put(change.to_dict()))
+tracked["a"] = 1
+
+events.put(None)  # sentinel: flush what is queued, then stop
+thread.join()
+```
+
+- Use an unbounded `queue.Queue()`. A bounded queue's `put` blocks while the tree lock is held and
+  can deadlock if the consumer mutates the same tree.
+- The worker must catch its own exceptions: they no longer surface from the mutation.
+- Send a sentinel and `join` the worker at shutdown, or queued events are lost at exit.
+
+`async_queue_observer` is the asyncio equivalent; see [Async observers](#async-observers).
