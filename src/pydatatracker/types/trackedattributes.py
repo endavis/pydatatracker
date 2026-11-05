@@ -303,16 +303,17 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        if attribute_name in self._tracking_attributes_to_monitor:
-            return
-        if hasattr(self, attribute_name):
+        with self._tracking_tree_lock:
+            if attribute_name in self._tracking_attributes_to_monitor:
+                return
+            if hasattr(self, attribute_name):
+                self._tracking_attributes_to_monitor.append(attribute_name)
+                self._tracking_start_monitoring(attribute_name, getattr(self, attribute_name))
+                return
+            if attribute_name in self._tracking_declared_fields:
+                return
             self._tracking_attributes_to_monitor.append(attribute_name)
-            self._tracking_start_monitoring(attribute_name, getattr(self, attribute_name))
-            return
-        if attribute_name in self._tracking_declared_fields:
-            return
-        self._tracking_attributes_to_monitor.append(attribute_name)
-        self._tracking_pending_monitor.add(attribute_name)
+            self._tracking_pending_monitor.add(attribute_name)
 
     def _tracking_attribute_change(
         self, method: str, attribute_name: str, original_value: Any, new_value: Any
@@ -441,20 +442,21 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        if not hasattr(self, attribute_name):
-            return
+        with self._tracking_tree_lock:
+            if not hasattr(self, attribute_name):
+                return
 
-        if attribute_name in self._tracking_locked_attributes:
-            value = getattr(self, attribute_name)
-            if self._tracking_is_trackable(value):
-                value.unlock()
+            if attribute_name in self._tracking_locked_attributes:
+                value = getattr(self, attribute_name)
+                if self._tracking_is_trackable(value):
+                    value.unlock()
 
-            self._tracking_locked_attributes.discard(attribute_name)
-            self.tracking_create_change(
-                action="unlock",
-                attribute_name=attribute_name,
-                attribute_locked=self._tracking_is_locked_attribute(attribute_name),
-            )
+                self._tracking_locked_attributes.discard(attribute_name)
+                self.tracking_create_change(
+                    action="unlock",
+                    attribute_name=attribute_name,
+                    attribute_locked=self._tracking_is_locked_attribute(attribute_name),
+                )
 
     @track_changes
     def lock(self, attribute_name: str = "") -> None:
@@ -500,14 +502,15 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        if attribute_name:
-            self._tracking_unlock_attribute(attribute_name)
-        else:
-            self._tracking_locked = False
-            for attribute in self._tracking_attributes_to_monitor:
-                self._tracking_unlock_attribute(attribute)
+        with self._tracking_tree_lock:
+            if attribute_name:
+                self._tracking_unlock_attribute(attribute_name)
+            else:
+                self._tracking_locked = False
+                for attribute in self._tracking_attributes_to_monitor:
+                    self._tracking_unlock_attribute(attribute)
 
-            self.tracking_create_change(action="unlock")
+                self.tracking_create_change(action="unlock")
 
     def __setattr__(self, attribute_name: str, value: Any) -> None:
         """Set the value of the specified attribute.
@@ -537,8 +540,27 @@ class TrackedAttr(TrackBase):
             object.__setattr__(self, attribute_name, value)
             return
         monitored = self.__dict__.get("_tracking_attributes_to_monitor")
-        if monitored is None or attribute_name not in monitored:
-            if monitored is not None and attribute_name in self._tracking_declared_fields:
+        if monitored is None or (
+            attribute_name not in monitored and attribute_name not in self._tracking_declared_fields
+        ):
+            object.__setattr__(self, attribute_name, value)
+            return
+        with self._tracking_tree_lock:
+            self._tracking_setattr_locked(attribute_name, value, monitored)
+
+    def _tracking_setattr_locked(
+        self, attribute_name: str, value: Any, monitored: list[str]
+    ) -> None:
+        """Run ``__setattr__`` for an initialised object with the tree lock held.
+
+        Args:
+            attribute_name: The name of the attribute to set.
+            value: The new value to assign to the attribute.
+            monitored: The list of monitored attribute names.
+
+        """
+        if attribute_name not in monitored:
+            if attribute_name in self._tracking_declared_fields:
                 if self._tracking_locked:
                     raise RuntimeError(
                         f"{self.__class__.__name__}.{attribute_name} is locked and "
@@ -590,9 +612,10 @@ class TrackedAttr(TrackBase):
         if monitored is None or attribute_name not in monitored:
             object.__delattr__(self, attribute_name)
             return
-        old_value = self.__dict__.get(attribute_name)
-        object.__delattr__(self, attribute_name)
-        self._tracking_release_child(old_value)
+        with self._tracking_tree_lock:
+            old_value = self.__dict__.get(attribute_name)
+            object.__delattr__(self, attribute_name)
+            self._tracking_release_child(old_value)
 
     def _tracking_known_uuids_tree(
         self, level: int = 0, attribute_name: str = "", emptybar: dict | None = None

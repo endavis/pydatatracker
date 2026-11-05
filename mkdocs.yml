@@ -106,6 +106,7 @@ nav:
       - Basics: usage/basics.md
       - Debugging & Observability: usage/debugging.md
       - Performance: usage/performance.md
+      - Threading: usage/threading.md
   - Development:
       - Architecture: development/architecture.md
       - Coding Standards: development/coding-standards.md
@@ -146,6 +147,7 @@ nav:
       - Tools Reference: template/tools-reference.md
   - Decisions:
       - Overview: decisions/README.md
+      - ADR-0001 Thread safety: decisions/0001-tracked-containers-serialize-mutations-with-a-tree-wide-rlock.md
       - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
       - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
       - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md

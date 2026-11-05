@@ -25,6 +25,7 @@ Complete index of all documentation, organized by audience and as a full alphabe
 - [pydatatracker Documentation](index.md) - Welcome and overview of the project
 - [Template Management](template/manage.md) - Unified interface for creating projects, checking updates, and syncing
 - [Template Tools Reference](template/tools-reference.md) - Complete reference for all template tools in tools/pyproject_template/
+- [Threading](usage/threading.md) - How tracked containers behave under concurrent use, what the tree-wide lock guards, and what it does not
 - [Usage Guide](usage/basics.md) - Package usage and development workflows
 - [Using This Template](template/index.md) - Overview of using pyproject-template for your Python projects
 <!-- END:audience=users -->
@@ -32,6 +33,7 @@ Complete index of all documentation, organized by audience and as a full alphabe
 ### For Contributors
 <!-- BEGIN:audience=contributors -->
 - [Add a Feature: End-to-End Walkthrough](examples/add-a-feature.md) - Step-by-step example of adding a module, CLI subcommand, tests, and docs to the project
+- [ADR-0001: Tracked containers serialize mutations with a tree-wide RLock](decisions/0001-tracked-containers-serialize-mutations-with-a-tree-wide-rlock.md) - Every tree of tracked containers shares one RLock held for the whole of each mutating call, so concurrent mutation of one tree is safe and reads stay unlocked
 - [ADR-9001: Use uv for package management](decisions/9001-use-uv-for-package-management.md) - Use uv for dependency management, virtual environments and package installation
 - [ADR-9002: Use doit for task automation](decisions/9002-use-doit-for-task-automation.md) - Use doit as the task runner for testing, linting, building and other routine operations
 - [ADR-9003: Use ruff for linting and formatting](decisions/9003-use-ruff-for-linting-and-formatting.md) - Use ruff as the one tool for linting and formatting, in place of flake8, black and isort
@@ -94,6 +96,7 @@ Complete index of all documentation, organized by audience and as a full alphabe
 - [Ruff Auto-Fix on Edit Hook](development/ai/ruff-fix-hook.md) - PostToolUse hook that runs ruff --fix on edited Python files
 - [Slash Commands and Workflows](development/ai/slash-commands.md) - Reference for the slash commands and dual-agent workflow this project ships with
 - [Template Tools Reference](template/tools-reference.md) - Complete reference for all template tools in tools/pyproject_template/
+- [Threading](usage/threading.md) - How tracked containers behave under concurrent use, what the tree-wide lock guards, and what it does not
 - [Tooling Roles and Architectural Boundaries](development/tooling-roles.md) - What each tool is for, who uses it, and where runtime code ends and dev tooling begins
 <!-- END:audience=contributors -->
 
@@ -120,6 +123,7 @@ Complete index of all documentation, organized by audience and as a full alphabe
 ## Complete Index
 <!-- BEGIN:all -->
 - [Add a Feature: End-to-End Walkthrough](examples/add-a-feature.md) - Step-by-step example of adding a module, CLI subcommand, tests, and docs to the project
+- [ADR-0001: Tracked containers serialize mutations with a tree-wide RLock](decisions/0001-tracked-containers-serialize-mutations-with-a-tree-wide-rlock.md) - Every tree of tracked containers shares one RLock held for the whole of each mutating call, so concurrent mutation of one tree is safe and reads stay unlocked
 - [ADR-9001: Use uv for package management](decisions/9001-use-uv-for-package-management.md) - Use uv for dependency management, virtual environments and package installation
 - [ADR-9002: Use doit for task automation](decisions/9002-use-doit-for-task-automation.md) - Use doit as the task runner for testing, linting, building and other routine operations
 - [ADR-9003: Use ruff for linting and formatting](decisions/9003-use-ruff-for-linting-and-formatting.md) - Use ruff as the one tool for linting and formatting, in place of flake8, black and isort
@@ -190,6 +194,7 @@ Complete index of all documentation, organized by audience and as a full alphabe
 - [Slash Commands and Workflows](development/ai/slash-commands.md) - Reference for the slash commands and dual-agent workflow this project ships with
 - [Template Management](template/manage.md) - Unified interface for creating projects, checking updates, and syncing
 - [Template Tools Reference](template/tools-reference.md) - Complete reference for all template tools in tools/pyproject_template/
+- [Threading](usage/threading.md) - How tracked containers behave under concurrent use, what the tree-wide lock guards, and what it does not
 - [Tooling Roles and Architectural Boundaries](development/tooling-roles.md) - What each tool is for, who uses it, and where runtime code ends and dev tooling begins
 - [Usage Guide](usage/basics.md) - Package usage and development workflows
 - [Using This Template](template/index.md) - Overview of using pyproject-template for your Python projects
