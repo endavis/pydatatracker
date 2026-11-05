@@ -485,7 +485,7 @@ class TrackBase:
         self._tracking_observers: dict[int, list[_ObserverRef]] = {}
         self._tracking_context: dict[str, Any] = {}
         self._tracking_change_uuids: set[str] = set()
-        self._tracking_created = datetime.datetime.now()
+        self._tracking_created = datetime.datetime.now(datetime.UTC)
         self._tracking_child_tracked_items: dict[str, Any] = {}
         # Live parents by uuid. A child can have several, so lock state and
         # lock merging look at all of them.
@@ -1147,7 +1147,8 @@ class TrackBase:
 
         Args:
             since: Datetime or ChangeLogEntry whose timestamp defines the lower bound.
-                When None, returns all changes.
+                When None, returns all changes. A naive datetime is interpreted as
+                local time.
 
         Returns:
             A list of changes ordered chronologically.
@@ -1156,6 +1157,8 @@ class TrackBase:
         if since is None:
             return list(self._tracking_changes)
         threshold = since.created_time if isinstance(since, ChangeLogEntry) else since
+        if threshold.tzinfo is None:
+            threshold = threshold.astimezone()
         return [entry for entry in self._tracking_changes if entry.created_time >= threshold]
 
     def _tracking_notify_observers(self, change_log_entry: ChangeLogEntry) -> None:
