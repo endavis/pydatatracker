@@ -295,7 +295,11 @@ class TrackedDict(TrackBase, dict):
         value = default
 
         if not self._tracking_locked:
-            value = super().pop(key) if default is _MISSING else super().pop(key, default)
+            if not dict.__contains__(self, key):
+                if default is _MISSING:
+                    raise KeyError(key)
+                return default  # no-op: leave "action" unset so nothing is recorded
+            value = super().pop(key)
             self._tracking_context.setdefault("removed_items", []).append(value)
             self._tracking_context["value"] = value
 
@@ -408,8 +412,9 @@ class TrackedDict(TrackBase, dict):
         original_default = default
 
         if not self._tracking_locked:
-            if key not in self:
-                default = self._tracking_store_item(default, key)
+            if key in self:
+                return dict.__getitem__(self, key)  # no-op: records nothing
+            default = self._tracking_store_item(default, key)
             default = super().setdefault(key, default)
 
         self._tracking_context["action"] = "update"
@@ -436,6 +441,8 @@ class TrackedDict(TrackBase, dict):
 
         """
         if not self._tracking_locked:
+            if not dict.__len__(self):
+                return  # no-op: records nothing
             for item in self:
                 self._tracking_context.setdefault("removed_items", []).append(self[item])
 
