@@ -44,6 +44,8 @@ tags:
 
 ## Observability controls
 
+All three container types share one keyword-only option set (see [Constructor options](../usage/basics.md#constructor-options)); `None` for an inheritable option means "inherit from `tracking_parent`, else the default".
+
 - `tracking_capture_snapshots`: opt-in repr snapshots per container
 - `tracking_capture_stack`: opt-in stack/actor inference for debugging
 - `tracking_max_changes`: opt-in cap on stored change entries (`collections.deque(maxlen=...)`); inherited from `tracking_parent`, default unbounded

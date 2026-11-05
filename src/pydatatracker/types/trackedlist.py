@@ -64,7 +64,8 @@ class TrackedList(TrackBase, list):
     def __init__(
         self,
         data: list | None = None,
-        tracking_auto_converted_in: str | None = None,
+        *,
+        tracking_name: str | None = None,
         tracking_auto_convert: bool = False,
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
@@ -80,10 +81,12 @@ class TrackedList(TrackBase, list):
 
         Args:
             data: The initial data for the list.
-            tracking_auto_converted_in: The attribute to automatically convert in.
+            tracking_name: Optional name, read back through ``tracking_name``.
             tracking_auto_convert: Whether to automatically convert values.
             tracking_parent: The parent tracking object.
             tracking_location: The location of the tracking object.
+            tracking_capture_snapshots: Record before/after reprs; None inherits.
+            tracking_capture_stack: Record call stacks; None inherits.
             tracking_record_init: Whether to record the ``init`` entry; None inherits.
             tracking_max_changes: Cap on stored change entries (oldest dropped); None
                 inherits from the parent, else unbounded.
@@ -92,23 +95,17 @@ class TrackedList(TrackBase, list):
         if data is None:
             data = []
         list.__init__(self, data)
-        extra_kwargs: dict[str, Any] = {}
-        if tracking_capture_snapshots is not None:
-            extra_kwargs["tracking_capture_snapshots"] = tracking_capture_snapshots
-        if tracking_capture_stack is not None:
-            extra_kwargs["tracking_capture_stack"] = tracking_capture_stack
-        if tracking_record_init is not None:
-            extra_kwargs["tracking_record_init"] = tracking_record_init
-        if tracking_max_changes is not None:
-            extra_kwargs["tracking_max_changes"] = tracking_max_changes
         TrackBase.__init__(
             self,
-            tracking_auto_converted_in=tracking_auto_converted_in,
+            tracking_name=tracking_name,
             tracking_auto_convert=tracking_auto_convert,
             tracking_parent=tracking_parent,
             tracking_location=tracking_location,
+            tracking_capture_snapshots=tracking_capture_snapshots,
+            tracking_capture_stack=tracking_capture_stack,
+            tracking_record_init=tracking_record_init,
+            tracking_max_changes=tracking_max_changes,
             tracking_delimiter="|",
-            **extra_kwargs,
         )
 
     def _tracking_convert_all_values(self) -> None:

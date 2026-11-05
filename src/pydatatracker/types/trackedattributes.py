@@ -97,7 +97,9 @@ class TrackedAttr(TrackBase):
 
     def __init__(
         self,
-        tracking_auto_convert: bool = True,
+        *,
+        tracking_name: str | None = None,
+        tracking_auto_convert: bool = False,
         tracking_parent: "TrackBase | None" = None,
         tracking_location: str | None = "",
         tracking_capture_snapshots: bool | None = None,
@@ -113,8 +115,9 @@ class TrackedAttr(TrackBase):
         to monitor, locked attributes, and original values.
 
         Args:
+            tracking_name: Optional name, read back through ``tracking_name``.
             tracking_auto_convert: Whether to automatically convert tracked attribute
-                values.
+                values (default False).
             tracking_parent: The parent TrackBase instance for hierarchical tracking.
             tracking_location: The location identifier for the tracked attribute.
             tracking_capture_snapshots: Whether to capture before/after repr snapshots.
@@ -129,20 +132,17 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        record_kwargs: dict[str, Any] = {}
-        if tracking_record_init is not None:
-            record_kwargs["tracking_record_init"] = tracking_record_init
-        if tracking_max_changes is not None:
-            record_kwargs["tracking_max_changes"] = tracking_max_changes
         TrackBase.__init__(
             self,
+            tracking_name=tracking_name,
             tracking_auto_convert=tracking_auto_convert,
             tracking_parent=tracking_parent,
             tracking_location=tracking_location,
-            tracking_delimiter=".",
             tracking_capture_snapshots=tracking_capture_snapshots,
             tracking_capture_stack=tracking_capture_stack,
-            **record_kwargs,
+            tracking_record_init=tracking_record_init,
+            tracking_max_changes=tracking_max_changes,
+            tracking_delimiter=".",
         )
         self._tracking_attributes_to_monitor: list[str] = []
         self._tracking_locked_attributes: set[str] = set()
@@ -393,7 +393,7 @@ class TrackedAttr(TrackBase):
         """
         pass
 
-    def _tracking_get_original_value(self, attribute_name: str) -> Any:
+    def tracking_get_original_value(self, attribute_name: str) -> Any:
         """Retrieve the original value of a specified tracked attribute.
 
         This method looks up the original value of the given attribute name from

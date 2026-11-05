@@ -8,7 +8,7 @@ from typing import Any, ClassVar
 import pytest
 
 from pydatatracker import TrackedAttr, TrackedDict, TrackedList
-from pydatatracker.types._trackbase import _TRACKING_RUNTIME_KEYS
+from pydatatracker.types._trackbase import _TRACKING_RUNTIME_KEYS, TrackBase
 
 
 def _pickle_round_trip(obj: Any) -> Any:  # noqa: ANN401
@@ -181,7 +181,6 @@ def test_children_are_copied_and_relinked(duplicate: Callable[[Any], Any]) -> No
     assert new_child._tracking_uuid != child._tracking_uuid
     assert clone._tracking_child_tracked_items[new_child._tracking_uuid]["location"] == "c"
     assert new_child._tracking_tree_lock is clone._tracking_tree_lock
-    assert new_child._tracking_auto_converted_in == clone._tracking_uuid
     before_original = len(original.tracking_changes())
     new_child["x"] = 2
     forwarded = clone.tracking_changes()[-1]
@@ -322,3 +321,10 @@ def test_runtime_keys_are_reset_and_not_in_state(cls: type) -> None:
     for key in _TRACKING_RUNTIME_KEYS:
         assert key in obj.__dict__
     assert not _TRACKING_RUNTIME_KEYS & set(obj.__getstate__()["attributes"])
+
+
+@pytest.mark.parametrize("duplicate", ALL, ids=IDS)
+@pytest.mark.parametrize("cls", [TrackedDict, TrackedList, TrackedAttr])
+def test_tracking_name_survives_copy(cls: type[TrackBase], duplicate: Callable[[Any], Any]) -> None:
+    original = cls(tracking_name="named")
+    assert duplicate(original).tracking_name == "named"

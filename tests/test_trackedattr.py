@@ -147,7 +147,7 @@ def test_declared_field_second_assignment_records_update() -> None:
     assert change.extra["location"] == "a"
     assert change.extra["data_pre_change"] == "1"
     assert change.extra["data_post_change"] == "2"
-    assert obj._tracking_get_original_value("a") == 1
+    assert obj.tracking_get_original_value("a") == 1
 
 
 def test_declared_fields_union_parent_first() -> None:
@@ -824,7 +824,7 @@ def test_attr_unset_marker_string_is_a_real_value() -> None:
 
     assert len(obj.tracking_changes()) == before + 1
     assert _latest_change(obj).extra["data_pre_change"] == "#!NotSet"
-    assert obj._tracking_get_original_value("a") == 1
+    assert obj.tracking_get_original_value("a") == 1
 
 
 def test_attr_reassignment_after_delete_initializes_the_original_value_without_an_update() -> None:
@@ -835,12 +835,12 @@ def test_attr_reassignment_after_delete_initializes_the_original_value_without_a
     obj.a = "#!NotSet"
 
     assert len(obj.tracking_changes()) == before
-    assert obj._tracking_get_original_value("a") == "#!NotSet"
+    assert obj.tracking_get_original_value("a") == "#!NotSet"
 
     obj.a = "later"
 
     assert len(obj.tracking_changes()) == before + 1
-    assert obj._tracking_get_original_value("a") == "#!NotSet"
+    assert obj.tracking_get_original_value("a") == "#!NotSet"
 
 
 @pytest.mark.parametrize("result", [[], [False], 0, 1, None, AmbiguousTruth()])
