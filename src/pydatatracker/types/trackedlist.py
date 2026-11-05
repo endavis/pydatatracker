@@ -629,7 +629,6 @@ class TrackedList(TrackBase, list):
 
     def _tracking_tree_children(self) -> Iterator[tuple[str, Any, bool]]:
         """Yield one ``([index], item, is_last)`` row per item."""
-        left = list(range(len(self)))
-        for item in self:
-            left.remove(self.index(item))
-            yield f"[{self.index(item)}]", item, not left
+        last = len(self) - 1
+        for pos, item in enumerate(self):
+            yield f"[{pos}]", item, pos == last
