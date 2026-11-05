@@ -42,8 +42,8 @@ import datetime
 import inspect
 import pprint
 import threading
+from random import getrandbits
 from typing import Any
-from uuid import uuid4
 
 # 3rd Party
 
@@ -55,6 +55,15 @@ _TIMESTAMP_LOCK = threading.Lock()
 _last_timestamp = datetime.datetime.min.replace(tzinfo=datetime.UTC)
 _ONE_MICROSECOND = datetime.timedelta(microseconds=1)
 _MISSING = object()
+
+
+def _new_id() -> str:
+    """Return an opaque 32-char lowercase hex identifier.
+
+    Cheaper than ``uuid4().hex``; the value is random but not an RFC 4122 v4 UUID.
+    """
+    # Ids are opaque labels for dedup, equality and filenames, never secrets (#68).
+    return f"{getrandbits(128):032x}"  # nosec B311
 
 
 def _next_timestamp() -> datetime.datetime:
@@ -138,7 +147,7 @@ class ChangeLogEntry:
                     - method: The method name that caused the change
 
         """
-        self.uuid = uuid4().hex
+        self.uuid = _new_id()
         self.tracked_item_uuid = item_uuid
         self.extra = kwargs
         self.header_column_width = 17

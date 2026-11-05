@@ -1,9 +1,12 @@
 """Regression tests: ChangeLogEntry.copy() must not recapture the stack (#26)."""
 
+import re
 from unittest.mock import patch
 
+import pytest
+
 from pydatatracker import TrackedDict
-from pydatatracker.utils.changelog import ChangeLogEntry
+from pydatatracker.utils.changelog import ChangeLogEntry, _new_id
 
 
 def test_copy_does_not_capture_stack() -> None:
@@ -48,3 +51,23 @@ def test_forwarded_child_change_skips_stack_capture() -> None:
     assert [e.tracked_item_uuid for e in seen] == [parent._tracking_uuid]
     # Only the child's own entry captures; forwarded copies must not.
     assert get_stack.call_count == 1
+
+
+_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def test_ids_are_32_lowercase_hex() -> None:
+    assert _ID_RE.match(ChangeLogEntry("item", type="update").uuid)
+    assert _ID_RE.match(TrackedDict()._tracking_uuid)
+
+
+def test_ids_are_zero_padded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("pydatatracker.utils.changelog.getrandbits", lambda _bits: 5)
+    expected = "0" * 31 + "5"
+    assert ChangeLogEntry("item", type="update").uuid == expected
+    assert TrackedDict()._tracking_uuid == expected
+
+
+def test_ids_are_unique() -> None:
+    ids = {_new_id() for _ in range(10_000)}
+    assert len(ids) == 10_000
