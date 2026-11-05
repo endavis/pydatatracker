@@ -313,6 +313,29 @@ def test_capped_formatted_updates_shows_twenty() -> None:
     assert lines.count("--------------------------------------") == 21
 
 
+def test_formatted_updates_shows_most_recent_twenty() -> None:
+    """Formatted updates show the newest 20 entries in chronological order."""
+    items = TrackedList()
+    for i in range(30):
+        items.append(i)
+    lines = items.tracking_get_formatted_updates()
+    assert lines.count("--------------------------------------") == 21
+    locations = [line for line in lines if "Location" in line]
+    assert len(locations) == 20
+    assert locations[-1].endswith("29")
+    assert locations[0].endswith("10")
+
+
+def test_formatted_updates_under_twenty_shows_all() -> None:
+    """Formatted updates with fewer than 20 entries show every entry."""
+    items = TrackedList()
+    for i in range(5):
+        items.append(i)
+    lines = items.tracking_get_formatted_updates()
+    # The init entry plus 5 appends, and one trailing separator.
+    assert lines.count("--------------------------------------") == 7
+
+
 def test_max_changes_zero_keeps_no_history_but_notifies() -> None:
     """A cap of 0 stores nothing while observers still fire."""
     items = TrackedList(tracking_max_changes=0)

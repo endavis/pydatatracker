@@ -1375,7 +1375,7 @@ class TrackBase:
 
         """
         new_output = []
-        for item in itertools.islice(self._tracking_changes, 20):
+        for item in self.tracking_changes(most_recent=20):
             new_output.append("--------------------------------------")
             new_output.extend(item.format_detailed())
         new_output.append("--------------------------------------")
