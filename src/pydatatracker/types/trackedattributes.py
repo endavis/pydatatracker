@@ -40,7 +40,6 @@ Classes:
 
 # Standard Library
 import contextlib
-import sys
 from collections.abc import Iterator
 from typing import Any, ClassVar
 
@@ -324,8 +323,7 @@ class TrackedAttr(TrackBase):
 
         """
         if original_value is _NOT_SET:
-            with contextlib.suppress(Exception):
-                self._tracking_original_values[attribute_name] = new_value
+            self._tracking_original_values[attribute_name] = new_value
             return
         if original_value is new_value:
             return
@@ -579,9 +577,7 @@ class TrackedAttr(TrackBase):
             self._tracking_release_child(original_value)
 
         if is_tracking:
-            self._tracking_attribute_change(
-                sys._getframe().f_code.co_name, attribute_name, original_value, value
-            )
+            self._tracking_attribute_change("__setattr__", attribute_name, original_value, value)
 
     def __delattr__(self, attribute_name: str) -> None:
         """Delete an attribute, releasing a monitored attribute's child.

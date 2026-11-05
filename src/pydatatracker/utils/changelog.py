@@ -54,6 +54,7 @@ _IGNORE_IN_STACK: list[str] = []
 _TIMESTAMP_LOCK = threading.Lock()
 _last_timestamp = datetime.datetime.min.replace(tzinfo=datetime.UTC)
 _ONE_MICROSECOND = datetime.timedelta(microseconds=1)
+_MISSING = object()
 
 
 def _next_timestamp() -> datetime.datetime:
@@ -217,6 +218,15 @@ class ChangeLogEntry:
         """
         return self.uuid == value.uuid if isinstance(value, ChangeLogEntry) else False
 
+    def __hash__(self) -> int:
+        """Hash by UUID, consistent with ``__eq__``.
+
+        Returns:
+            The hash of this entry's UUID.
+
+        """
+        return hash(self.uuid)
+
     def __lt__(self, value: object) -> bool:
         """Compare if this ChangeLogEntry is less than another by creation time.
 
@@ -354,15 +364,15 @@ class ChangeLogEntry:
             A list of formatted strings representing the data.
 
         """
-        data = getattr(self, name, self.extra.get(name, "-#@$%##$"))
+        data = getattr(self, name, self.extra.get(name, _MISSING))
 
-        if data == "-#@$%##$":
+        if data is _MISSING:
             return []
 
         header = fix_header(name)
         try:
             testdata = ast.literal_eval(data)
-        except Exception:
+        except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
             testdata = data
 
         if testdata in [None, "None", ""]:

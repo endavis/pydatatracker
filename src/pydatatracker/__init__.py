@@ -35,9 +35,7 @@ Classes:
     - `TrackedAttr`: Represents a class that can track attribute changes.
 """
 
-# imported to prevent circular references
 from ._version import __version__
-from .types._trackbase import TrackBase  # noqa: F401
 
 __all__ = [
     "ChangeCollector",
