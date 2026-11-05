@@ -95,6 +95,27 @@ assert len(items.tracking_changes()) == 100  # the newest entry is last
 - An entry evicted from the history can be recorded again if the same entry is re-submitted,
   because its uuid is dropped from the dedup set to keep memory bounded.
 
+### Copying and pickling
+
+`copy()` is a read: it returns a deep, plain `dict`/`list` snapshot (nested tracked values become
+plain containers), records no change entry and works on a locked container.
+`copy(untracked=False)` returns the shallow plain `dict.copy` / `list.copy` result.
+
+`copy.copy`, `copy.deepcopy` and `pickle` instead give an independent tracked object:
+
+- A new `_tracking_uuid` and a history of only its own `init` entry (none when
+  `tracking_record_init=False`).
+- No observers and no parent. It gets a fresh tree lock.
+- Configuration (`tracking_auto_convert`, snapshot and stack capture, `tracking_max_changes`,
+  delimiter, name) and lock state are kept, including the locked attributes of a `TrackedAttr`.
+- `deepcopy` and `pickle` copy the tracked children and relink them, so a change to a copied child
+  forwards to the copy only.
+- `copy.copy` shares the child objects without linking them, so a change to a shared child forwards
+  to the original only.
+- The constructor is not called on reconstruction, and classes you pickle must be module-level.
+
+See [ADR-0002](../decisions/0002-copies-of-tracked-containers-are-independent-tracked-objects-with-fresh-history.md).
+
 ### Declaring monitored fields
 
 Subclass `TrackedAttr` and list the fields to monitor in `_tracking_fields`. Declared fields

@@ -621,30 +621,36 @@ class TrackedList(TrackBase, list):
 
         self._tracking_context["action"] = "update"
 
-    @check_lock
-    @track_changes
-    def copy(self, untracked: bool = True) -> "list[Any] | TrackedList":
-        """Copy the tracked list.
+    def copy(self, untracked: bool = True) -> "list[Any]":
+        """Return a copy of the list; this is a read.
 
-        This method creates a copy of the tracked list. If `untracked` is True,
-        the copy will be a regular list without tracking capabilities. Otherwise,
-        the copy will retain tracking capabilities.
+        It records no change entry and works on a locked list. The result is always
+        a plain ``list``, never tracked. For an independent tracked copy use
+        ``copy.copy``, ``copy.deepcopy`` or ``pickle``.
 
         Args:
-            untracked: Whether to create an untracked copy of the list.
+            untracked: If True (the default) the copy is deep, with nested tracked
+                values converted to plain ``dict``/``list``. If False it is the
+                shallow ``list.copy`` result.
 
         Returns:
-            A copy of the tracked list.
+            A plain ``list``.
 
         Example:
             >>> tracked_list = TrackedList([1, 2, 3])
-            >>> new_list = tracked_list.copy()  # Copy is tracked
-            >>> new_untracked_list = tracked_list.copy(untracked=True)  # Untracked copy
+            >>> plain = tracked_list.copy()  # deep plain list
+            >>> shallow = tracked_list.copy(untracked=False)  # shallow plain list
 
         """
-        new_data = self._tracking_convert_to_untrackable(self) if untracked else super().copy()
-        self._tracking_context["action"] = "copy"
-        return new_data
+        return self._tracking_convert_to_untrackable(self) if untracked else super().copy()
+
+    def _tracking_copy_payload(self) -> Any:
+        """Return the items for a copy."""
+        return list(list.__iter__(self))
+
+    def _tracking_restore_payload(self, payload: Any) -> None:
+        """Fill the list without tracking or conversion."""
+        list.extend(self, payload)
 
     def _tracking_known_uuids_tree(
         self, level: int = 0, emptybar: dict[int, bool] | None = None
