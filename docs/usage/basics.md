@@ -146,6 +146,12 @@ assert len(items.tracking_changes()) == 100  # the newest entry is last
 - An entry evicted from the history can be recorded again if the same entry is re-submitted,
   because its uuid is dropped from the dedup set to keep memory bounded.
 
+### Identifiers
+
+A change entry's `uuid` and an object's `tracking_uuid` are opaque 32-character lowercase hex
+identifiers, random and unique but not guaranteed to be RFC 4122 v4 UUIDs. Treat them as strings
+to compare, not as UUIDs to parse.
+
 ### Copying and pickling
 
 `copy()` is a read: it returns a deep, plain `dict`/`list` snapshot (nested tracked values become

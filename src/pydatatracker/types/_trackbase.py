@@ -52,11 +52,10 @@ from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import wraps
 from typing import Any, ClassVar, Literal
-from uuid import uuid4
 
 # 3rd Party
 # Project
-from ..utils.changelog import ChangeLogEntry
+from ..utils.changelog import ChangeLogEntry, _new_id
 from .actor import current_actor
 
 logger = logging.getLogger(__name__)
@@ -487,7 +486,7 @@ class TrackBase:
         """
         # One lock per tree: a root owns it, a linked child adopts its parent's.
         self._tracking_tree_lock: threading.RLock = threading.RLock()
-        self._tracking_uuid = uuid4().hex
+        self._tracking_uuid = _new_id()
         self._tracking_observers: dict[int, list[_ObserverRef]] = {}
         self._tracking_context: dict[str, Any] = {}
         self._tracking_change_uuids: set[str] = set()
