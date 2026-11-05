@@ -289,6 +289,7 @@ source_paths = ["src/"]
 pytest_add_cli_args_test_selection = [
     "tests/test_changelog_copy.py",
     "tests/test_changelog_copy_tree.py",
+    "tests/test_code_smells.py",
     "tests/test_config.py",
     "tests/test_constructor_options.py",
     "tests/test_convert_item_hook.py",

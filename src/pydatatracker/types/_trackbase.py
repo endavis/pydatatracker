@@ -59,6 +59,8 @@ from uuid import uuid4
 from ..utils.changelog import ChangeLogEntry
 from .actor import current_actor
 
+logger = logging.getLogger(__name__)
+
 # Argument types that can never hold a tracked value; the pre-merge scan skips them.
 _SCALAR_TYPES: frozenset[type] = frozenset({int, str, float, bool, bytes, type(None)})
 
@@ -661,7 +663,7 @@ class TrackBase:
 
         """
         if self._tracking_debug_flag:
-            logging.info(f"{self._tracking_uuid[:4]}..{self._tracking_uuid[-4:]} - {message}")
+            logger.info("%s..%s - %s", self._tracking_uuid[:4], self._tracking_uuid[-4:], message)
 
     def _tracking_add_child_tracked_item(
         self, location: str | None, trackable_item: "TrackBase"
