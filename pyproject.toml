@@ -303,6 +303,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_trackedattr.py",
     "tests/test_trackeddict.py",
     "tests/test_trackedlist.py",
+    "tests/test_trackbase_dedupe.py",
     "tests/test_tracking.py",
     "tests/test_tracking_is_trackable.py",
     "tests/test_version.py",
