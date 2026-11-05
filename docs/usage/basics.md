@@ -108,6 +108,8 @@ changes = tracked.changes_since(first_change)
 print([entry.extra["location"] for entry in changes])
 ```
 
+`changes_since(...)` also accepts a datetime; a naive datetime is interpreted as local time.
+
 ### Capping change history
 
 By default every change is kept, so a long-running process grows without limit. Pass

@@ -101,6 +101,38 @@ def test_last_change_and_changes_since() -> None:
     assert [entry.extra["location"] for entry in recent_changes] == ["beta"]
 
 
+def test_changes_since_accepts_naive_datetime() -> None:
+    """A naive datetime is read as local time and compares with aware timestamps."""
+    tracked = TrackedDict()
+    tracked["alpha"] = 1
+    last = tracked.last_change()
+    assert last is not None
+
+    past = datetime.datetime.now() - datetime.timedelta(days=1)
+    future = datetime.datetime.now() + datetime.timedelta(days=1)
+    assert tracked.changes_since(past) == tracked.changes_since(None)
+    assert tracked.changes_since(future) == []
+
+    aware = last.created_time
+    naive_same_instant = aware.astimezone().replace(tzinfo=None)
+    assert tracked.changes_since(naive_same_instant) == tracked.changes_since(aware)
+    assert tracked.changes_since(aware)[0] == last
+
+
+def test_changes_since_aware_datetime_still_works() -> None:
+    tracked = TrackedDict()
+    tracked["alpha"] = 1
+    past = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=1)
+    future = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=1)
+    assert tracked.changes_since(past) == tracked.changes_since(None)
+    assert tracked.changes_since(future) == []
+
+
+def test_tracking_created_is_timezone_aware() -> None:
+    tracked = TrackedDict()
+    assert tracked._tracking_created.tzinfo is not None
+
+
 def test_change_collector_observer_records_events() -> None:
     tracked = TrackedDict()
     collector = ChangeCollector()
