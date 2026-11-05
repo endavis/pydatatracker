@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793893892218,
+  "lastUpdate": 1793895223589,
   "repoUrl": "https://github.com/endavis/pydatatracker",
   "entries": {
     "Benchmark": [
@@ -4770,6 +4770,149 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000001964682332368108",
             "extra": "mean: 16.90293405379013 usec\nrounds: 61535"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f9f4586d742ae302906558425f4fffe568499fe5",
+          "message": "refactor: move duplicated notify, tree and uuid-tree logic into TrackBase (merges PR #100, addresses #70)\n\nTrackedDict, TrackedList and TrackedAttr each carried near-copies of the\nsame internals. These now live once on TrackBase:\n- Re-homing a child's change entry happens in\n  TrackBase._tracking_notify_observers, in the same order as before:\n  re-home, record, then the observer loop. The three overrides are gone.\n- One _tracking_format_tree_location serves all three types. It branches\n  on a _tracking_subscript_locations class flag, which dict and list set.\n- _tracking_known_uuids_tree and its helper moved to TrackBase. Each\n  type now supplies only a _tracking_tree_children hook.\n- TrackBase no longer imports its own subclasses to classify an object.\n  A _tracking_kind class attribute replaces _trackable_classes and\n  _load_trackable_classes.\n\nBehaviour is unchanged, and every existing test passes without edits.\ntests/test_trackbase_dedupe.py pins the re-homed entries, tree\nlocations and uuid-tree strings. It was written against the unmodified\nsource before the refactor.\n\nNotes:\n- #69 already covered the issue's __init__ bullet.\n- #56 is deliberately left alone. TrackedList's tree hook keeps the\n  self.index lookup, so after this change the #56 fix is a one-method\n  edit.\n- TrackedAttr._tracking_known_uuids_tree's private parameters are now\n  ordered (level, emptybar, attribute_name), to satisfy mypy's override\n  check. Every caller passes them by keyword.\n\nAddresses #70\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sceyzGx67XLdcr5dPL\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-05T16:12:28Z",
+          "tree_id": "5037f8f0402fe9b0093c592d208ed60b4c2e87fa",
+          "url": "https://github.com/endavis/pydatatracker/commit/f9f4586d742ae302906558425f4fffe568499fe5"
+        },
+        "date": 1793895223221,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_default",
+            "value": 512.7863631958326,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00010668354870478069",
+            "extra": "mean: 1.9501298625956265 msec\nrounds: 524"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_snapshots",
+            "value": 160.1154116602283,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00012980345425537936",
+            "extra": "mean: 6.245494981595166 msec\nrounds: 163"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackeddict_actor",
+            "value": 514.702240806055,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000036541945804334816",
+            "extra": "mean: 1.9428708886791306 msec\nrounds: 530"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append",
+            "value": 539.4597454961469,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00009862737070894427",
+            "extra": "mean: 1.853706431941997 msec\nrounds: 551"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_capped",
+            "value": 536.0835383401622,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003142979805466956",
+            "extra": "mean: 1.8653809126395293 msec\nrounds: 538"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[100]",
+            "value": 80040.34033296682,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001142335935340041",
+            "extra": "mean: 12.493699999775268 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[1000]",
+            "value": 62363.4500318035,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010752503944142327",
+            "extra": "mean: 16.035033332665687 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_append_with_history[10000]",
+            "value": 34932.87066619569,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005608298797817934",
+            "extra": "mean: 28.62633333388468 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[1000]",
+            "value": 58118.922939894685,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000037037604041906273",
+            "extra": "mean: 17.206100000066726 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[10000]",
+            "value": 41166.60674718301,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004134015587583653",
+            "extra": "mean: 24.291533332861565 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_insert_front_no_children[20000]",
+            "value": 34534.56045992181,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004833685647918545",
+            "extra": "mean: 28.956500001224107 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[1000]",
+            "value": 60107.953882714086,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004061120492164241",
+            "extra": "mean: 16.63673333401524 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[10000]",
+            "value": 45330.915683794075,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000034632398929768645",
+            "extra": "mean: 22.06000000034199 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_core.py::test_bench_trackedlist_pop_front_no_children[20000]",
+            "value": 27562.02834520561,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007435536065984018",
+            "extra": "mean: 36.281799999452836 usec\nrounds: 30"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_monitored",
+            "value": 16324.75846134424,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000498367246795411",
+            "extra": "mean: 61.25664905658006 usec\nrounds: 17225"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_update",
+            "value": 72481.46830312198,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000020373210712459956",
+            "extra": "mean: 13.796629999518473 usec\nrounds: 200"
+          },
+          {
+            "name": "tests/benchmarks/test_bench_trackedattr.py::test_bench_trackedattr_create_declared",
+            "value": 59386.772883001846,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016450206838913955",
+            "extra": "mean: 16.838766470272844 usec\nrounds: 61611"
           }
         ]
       }
