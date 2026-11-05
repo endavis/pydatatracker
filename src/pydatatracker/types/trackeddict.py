@@ -174,8 +174,7 @@ class TrackedDict(TrackBase, dict):
         except KeyError:
             old_item = None
 
-        if not self._tracking_locked:
-            super().__delitem__(key)
+        super().__delitem__(key)
 
         if old_item is not None:
             self._tracking_context.setdefault("removed_items", []).append(old_item)
@@ -209,11 +208,10 @@ class TrackedDict(TrackBase, dict):
         action = "update" if key in self else "add"
         old_item: Any = dict.__getitem__(self, key) if action == "update" else None
 
-        if not self._tracking_locked:
-            value = self._tracking_store_item(value, key)
-            super().__setitem__(key, value)
-            if old_item is not None and old_item is not value:
-                self._tracking_context.setdefault("removed_items", []).append(old_item)
+        value = self._tracking_store_item(value, key)
+        super().__setitem__(key, value)
+        if old_item is not None and old_item is not value:
+            self._tracking_context.setdefault("removed_items", []).append(old_item)
 
         self._tracking_context["action"] = action
         self._tracking_context["value"] = value
@@ -247,16 +245,13 @@ class TrackedDict(TrackBase, dict):
             >>> value = tracked.pop('c', 3)  # Returns the default 3
 
         """
-        value = default
-
-        if not self._tracking_locked:
-            if not dict.__contains__(self, key):
-                if default is _MISSING:
-                    raise KeyError(key)
-                return default  # no-op: leave "action" unset so nothing is recorded
-            value = super().pop(key)
-            self._tracking_context.setdefault("removed_items", []).append(value)
-            self._tracking_context["value"] = value
+        if not dict.__contains__(self, key):
+            if default is _MISSING:
+                raise KeyError(key)
+            return default  # no-op: leave "action" unset so nothing is recorded
+        value = super().pop(key)
+        self._tracking_context.setdefault("removed_items", []).append(value)
+        self._tracking_context["value"] = value
 
         self._tracking_context["action"] = "update"
         self._tracking_context["location"] = key
@@ -283,18 +278,12 @@ class TrackedDict(TrackBase, dict):
             >>> key, value = tracked.popitem()  # Removes and returns another pair
 
         """
-        key, value = "###^$^@$^$default###^$^@$^", "###^$^@$^$default###^$^@$^"
-
-        if not self._tracking_locked:
-            key, value = super().popitem()
+        key, value = super().popitem()
 
         self._tracking_context["action"] = "remove"
-        if value != "###^$^@$^$default###^$^@$^":
-            self._tracking_context.setdefault("removed_items", []).append(value)
-            self._tracking_context["value"] = value
-
-        if key != "###^$^@$^$default###^$^@$^":
-            self._tracking_context["location"] = key
+        self._tracking_context.setdefault("removed_items", []).append(value)
+        self._tracking_context["value"] = value
+        self._tracking_context["location"] = key
 
         return key, value
 
@@ -323,16 +312,15 @@ class TrackedDict(TrackBase, dict):
         """
         removed_items: list[Hashable] = []
         transformed_data: dict[Hashable, Any] = {}
-        if not self._tracking_locked:
-            incoming = dict(*args, **kwargs)
-            converted_values = self._tracking_store_items(
-                (value, key) for key, value in incoming.items()
-            )
-            for key, converted in zip(incoming, converted_values, strict=True):
-                if key in self and self[key] is not converted:
-                    removed_items.append(self[key])
-                transformed_data[key] = converted
-            super().update(transformed_data)
+        incoming = dict(*args, **kwargs)
+        converted_values = self._tracking_store_items(
+            (value, key) for key, value in incoming.items()
+        )
+        for key, converted in zip(incoming, converted_values, strict=True):
+            if key in self and self[key] is not converted:
+                removed_items.append(self[key])
+            transformed_data[key] = converted
+        super().update(transformed_data)
 
         self._tracking_context["action"] = "update"
         self._tracking_context["removed_items"] = removed_items
@@ -366,11 +354,10 @@ class TrackedDict(TrackBase, dict):
         """
         original_default = default
 
-        if not self._tracking_locked:
-            if key in self:
-                return dict.__getitem__(self, key)  # no-op: records nothing
-            default = self._tracking_store_item(default, key)
-            default = super().setdefault(key, default)
+        if key in self:
+            return dict.__getitem__(self, key)  # no-op: records nothing
+        default = self._tracking_store_item(default, key)
+        default = super().setdefault(key, default)
 
         self._tracking_context["action"] = "update"
         self._tracking_context["location"] = key
@@ -395,13 +382,12 @@ class TrackedDict(TrackBase, dict):
             >>> tracked.clear()  # Clears all items and tracks the operation
 
         """
-        if not self._tracking_locked:
-            if not dict.__len__(self):
-                return  # no-op: records nothing
-            for item in self:
-                self._tracking_context.setdefault("removed_items", []).append(self[item])
+        if not dict.__len__(self):
+            return  # no-op: records nothing
+        for item in self:
+            self._tracking_context.setdefault("removed_items", []).append(self[item])
 
-            super().clear()
+        super().clear()
 
         self._tracking_context["action"] = "remove"
 
