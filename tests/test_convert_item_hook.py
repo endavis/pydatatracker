@@ -167,12 +167,13 @@ def test_list_multiply_does_not_call_hook() -> None:
     assert len(_children(tracked)) == 1
 
 
-def test_list_already_tracked_not_linked() -> None:
+def test_list_already_tracked_is_linked() -> None:
     tracked = TrackedList()
-    child = TrackedDict({"a": 1})
+    child = TrackedDict({"text": "x"})
     tracked.append(child)
     assert tracked[0] is child
-    assert _children(tracked) == {}
+    assert child._tracking_uuid in _children(tracked)
+    _text_child_forwards(tracked, child)
 
 
 # ---- list rejection ---------------------------------------------------------
@@ -280,12 +281,15 @@ def test_dict_hook_runs_without_auto_convert() -> None:
     assert type(tracked["b"]) is list
 
 
-def test_dict_already_tracked_not_linked() -> None:
+def test_dict_already_tracked_is_linked() -> None:
     tracked = TrackedDict()
     child = TrackedList([1])
     tracked["a"] = child
     assert tracked["a"] is child
-    assert _children(tracked) == {}
+    assert child._tracking_uuid in _children(tracked)
+    before = len(tracked.tracking_changes())
+    child.append(2)
+    assert len(tracked.tracking_changes()) == before + 1
 
 
 def test_dict_constructor_rejection() -> None:

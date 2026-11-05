@@ -12,7 +12,7 @@ tags:
 
 ## Status
 
-Accepted
+Accepted. Amended 2026-11-05 by [ADR-0002](0002-linking-a-tracked-container-merges-tree-locks.md) (#67): linking a tracked container into another tree merges the two trees onto one lock.
 
 ## Decision
 
@@ -34,7 +34,7 @@ Three options were considered.
 
 - Concurrent mutation of one tree is serialised; separate trees run in parallel.
 - Observers run with the lock held. An observer that mutates another tree while another thread does the reverse can deadlock, and so can a bounded sync queue behind `async_queue_observer`.
-- Re-parenting a container while another thread uses it, and a container linked into two trees, are unsupported for concurrent use.
+- Re-parenting a container while another thread uses it is unsupported for concurrent use. A container linked into two trees merges their locks, see [ADR-0002](0002-linking-a-tracked-container-merges-tree-locks.md).
 - Each mutation pays for an uncontended RLock acquire; the figures are in the PR for #65.
 
 ## Documentation

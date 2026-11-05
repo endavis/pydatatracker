@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Any, Self
 
 # 3rd Party
 # Project
-from ._trackbase import TrackBase, check_lock, track_changes
+from ._trackbase import TrackBase, check_lock, merges_trees, track_changes
 
 if TYPE_CHECKING:
     from ..utils.changelog import ChangeLogEntry
@@ -225,6 +225,7 @@ class TrackedDict(TrackBase, dict):
         self._tracking_context["value"] = old_item
         self._tracking_context["location"] = key
 
+    @merges_trees
     @check_lock
     @track_changes
     def __setitem__(self, key: Hashable, value: Any) -> None:
@@ -335,6 +336,7 @@ class TrackedDict(TrackBase, dict):
 
         return key, value
 
+    @merges_trees
     @check_lock
     @track_changes
     def update(self, *args: Any, **kwargs: Any) -> None:
@@ -374,6 +376,7 @@ class TrackedDict(TrackBase, dict):
         self._tracking_context["removed_items"] = removed_items
         self._tracking_context["value"] = transformed_data
 
+    @merges_trees
     @check_lock
     @track_changes
     def setdefault(self, key: Hashable, default: Any | None = None) -> Any:

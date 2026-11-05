@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from pydatatracker import TrackedAttr, TrackedDict, TrackedList
+from pydatatracker.types._trackbase import TrackBase, _lock_owned
 from pydatatracker.utils.changelog import ChangeLogEntry
 
 THREADS = 6
@@ -476,3 +477,229 @@ def test_attr_pickle_round_trip_restores_a_working_lock() -> None:
     assert _lock_free_elsewhere(restored._tracking_tree_lock)
     restored.a = 2
     assert restored.a == 2
+
+
+# --- linking a pre-built container merges tree locks (#67) --------------------
+
+
+def _run_daemon_threads(
+    targets: list[Callable[[], None]], timeout: float = 30
+) -> list[BaseException]:
+    """Run targets in daemon threads; a thread still alive after ``timeout`` is a deadlock."""
+    errors: list[BaseException] = []
+
+    def _wrap(target: Callable[[], None]) -> Callable[[], None]:
+        def _runner() -> None:
+            try:
+                target()
+            except BaseException as exc:
+                errors.append(exc)
+
+        return _runner
+
+    threads = [threading.Thread(target=_wrap(t), daemon=True) for t in targets]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=timeout)
+    stuck = [thread for thread in threads if thread.is_alive()]
+    assert not stuck, f"{len(stuck)} thread(s) still running after {timeout}s: deadlock"
+    return errors
+
+
+def _nodes(root: TrackBase) -> list[TrackBase]:
+    """Return ``root`` and every node under it."""
+    found: dict[int, TrackBase] = {}
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if id(node) in found:
+            continue
+        found[id(node)] = node
+        stack.extend(entry["item"] for entry in node._tracking_child_tracked_items.values())
+    return list(found.values())
+
+
+def test_rlock_has_is_owned() -> None:
+    lock = threading.RLock()
+    assert hasattr(lock, "_is_owned")
+    assert lock._is_owned() is False
+    with lock:
+        assert lock._is_owned() is True
+
+
+def test_linking_merges_both_trees_onto_one_lock() -> None:
+    a = TrackedDict({"m": {"deep": {}}}, tracking_auto_convert=True)
+    b = TrackedDict({"n": {"deep": {}}}, tracking_auto_convert=True)
+    assert a._tracking_tree_lock is not b._tracking_tree_lock
+    a["b"] = b
+    nodes = _nodes(a)
+    assert len(nodes) == 6
+    assert all(node._tracking_tree_lock is a._tracking_tree_lock for node in nodes)
+
+
+def test_unlinking_one_of_two_parents_keeps_the_lock() -> None:
+    a, b, c = TrackedDict(), TrackedDict(), TrackedDict({"x": {}}, tracking_auto_convert=True)
+    a["c"] = c
+    b["c"] = c
+    lock = a._tracking_tree_lock
+    del a["c"]
+    assert c._tracking_tree_lock is lock
+    assert c["x"]._tracking_tree_lock is lock
+
+
+def test_unlinking_last_parent_gives_fresh_lock_and_does_not_split_parents() -> None:
+    a, b = TrackedDict(), TrackedDict()
+    c = TrackedDict({"x": {}}, tracking_auto_convert=True)
+    a["c"] = c
+    b["k"] = a
+    shared = a._tracking_tree_lock
+    assert b._tracking_tree_lock is shared
+    del a["c"]
+    assert a._tracking_tree_lock is shared
+    assert b._tracking_tree_lock is shared
+    fresh = c._tracking_tree_lock
+    assert fresh is not shared
+    assert c["x"]._tracking_tree_lock is fresh
+
+
+def test_unlinking_middle_node_keeps_lock_when_grandchild_is_still_held() -> None:
+    root = TrackedDict()
+    mid = TrackedDict()
+    grand = TrackedDict({"v": 0})
+    root["g"] = grand
+    root["m"] = mid
+    mid["g"] = grand
+    lock = root._tracking_tree_lock
+    del root["m"]
+    assert mid._tracking_tree_lock is lock
+    assert grand._tracking_tree_lock is lock
+
+
+def _watch_owned(node: TrackBase, bad: list[str]) -> None:
+    """Observe ``node`` and record any change delivered without the node's lock held."""
+
+    def _observer(entry: ChangeLogEntry) -> None:
+        if not _lock_owned(node._tracking_tree_lock):
+            bad.append(str(entry.extra.get("location")))
+
+    node.tracking_add_observer(_observer)
+
+
+def test_shared_child_stress_is_exact_and_always_under_its_lock() -> None:
+    a, b, c = TrackedDict(), TrackedDict(), TrackedDict()
+    a["c"] = c
+    b["c"] = c
+    bad: list[str] = []
+    for node in (a, b, c):
+        _watch_owned(node, bad)
+    before = {id(node): len(node.tracking_changes()) for node in (a, b, c)}
+    rounds = 300
+
+    def work(node: TrackedDict, prefix: str, tid: int) -> Callable[[], None]:
+        def _run() -> None:
+            for i in range(rounds):
+                node[f"{prefix}{tid}"] = i
+                node.pop(f"{prefix}{tid}")
+
+        return _run
+
+    targets = [
+        work(node, name, tid) for tid in range(2) for node, name in ((a, "a"), (b, "b"), (c, "c"))
+    ]
+    assert _run_daemon_threads(targets, timeout=60) == []
+
+    assert bad == []
+    per_node = 2 * rounds * 2
+    c_entries = c.tracking_changes()[before[id(c)] :]
+    assert len(c_entries) == per_node
+    for node in (a, b):
+        entries = node.tracking_changes()[before[id(node)] :]
+        forwarded = [e for e in entries if str(e.extra["location"]).startswith(("c:", "c|"))]
+        assert len(forwarded) == per_node
+        assert len(entries) == 2 * per_node
+
+
+def test_cross_link_race_does_not_deadlock_and_merges_all() -> None:
+    pairs = 200
+    left = [TrackedDict({"m": {}}, tracking_auto_convert=True) for _ in range(pairs)]
+    right = [TrackedDict({"n": {}}, tracking_auto_convert=True) for _ in range(pairs)]
+    barrier = threading.Barrier(2, timeout=20)
+
+    def one() -> None:
+        for i in range(pairs):
+            barrier.wait()
+            left[i]["x"] = right[i]["n"]
+
+    def two() -> None:
+        for i in range(pairs):
+            barrier.wait()
+            right[i]["y"] = left[i]["m"]
+
+    assert _run_daemon_threads([one, two], timeout=60) == []
+    for a_i, b_i in zip(left, right, strict=True):
+        locks = {id(node._tracking_tree_lock) for node in (a_i, b_i, a_i["m"], b_i["n"])}
+        assert len(locks) == 1
+
+
+def test_waiters_recheck_their_lock_after_a_merge() -> None:
+    a = TrackedDict()
+    b = TrackedDict()
+    bad: list[str] = []
+    _watch_owned(a, bad)
+    _watch_owned(b, bad)
+    entered = threading.Event()
+    release = threading.Event()
+    first = [True]
+
+    def _block(entry: ChangeLogEntry) -> None:
+        if first[0] and entry.extra.get("location") == "w":
+            first[0] = False
+            entered.set()
+            assert release.wait(timeout=20)
+
+    b.tracking_add_observer(_block)
+    results: list[BaseException] = []
+
+    def holder() -> None:
+        b["w"] = 0
+
+    def linker() -> None:
+        a["c"] = b
+
+    def writer() -> None:
+        b["z"] = 1
+
+    threads = [threading.Thread(target=t, daemon=True) for t in (holder,)]
+    threads[0].start()
+    assert entered.wait(timeout=20)
+    for target in (linker, writer):
+        thread = threading.Thread(target=target, daemon=True)
+        thread.start()
+        threads.append(thread)
+    release.set()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert not any(thread.is_alive() for thread in threads)
+    assert results == []
+    assert bad == []
+    assert a._tracking_tree_lock is b._tracking_tree_lock
+    assert dict(b) == {"w": 0, "z": 1}
+    assert _counts(b) == {("init", None): 1, ("add", "__setitem__"): 2}
+
+
+def test_observer_storing_a_node_across_trees_raises_and_changes_nothing() -> None:
+    a = TrackedDict()
+    b = TrackedDict({"n": {}}, tracking_auto_convert=True)
+    node = b["n"]
+
+    def _cross(entry: ChangeLogEntry) -> None:
+        if entry.extra.get("location") == "go" and entry.tracked_item_uuid == b._tracking_uuid:
+            a["x"] = node
+
+    b.tracking_add_observer(_cross)
+    with pytest.raises(RuntimeError, match="both"):
+        b["go"] = 1
+    assert "x" not in a
+    assert node._tracking_uuid not in a._tracking_child_tracked_items
+    assert a._tracking_tree_lock is not b._tracking_tree_lock

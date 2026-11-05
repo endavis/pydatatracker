@@ -294,6 +294,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_exporters.py",
     "tests/test_observer_errors.py",
     "tests/test_observers.py",
+    "tests/test_pretracked_links.py",
     "tests/test_thread_safety.py",
     "tests/test_trackedattr.py",
     "tests/test_trackeddict.py",

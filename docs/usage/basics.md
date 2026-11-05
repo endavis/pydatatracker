@@ -47,6 +47,39 @@ monitored attribute, including one added to monitoring after the lock, and store
 logs nothing. Unmonitored attributes can still be assigned. Locks are not counted: one
 `unlock()` (or `unlock(name)`) undoes any number of `lock()` calls.
 
+### Storing an already-tracked container
+
+A `TrackedDict`, `TrackedList` or `TrackedAttr` built elsewhere and stored into a tracked
+container becomes a child of it, the same as one the container converts itself. This holds for
+every store path (constructor, `__setitem__`, `update`, `|=`, `setdefault`, `append`, `insert`,
+`extend`, `+=`, slice assignment, attribute assignment and declared fields), and
+whatever `tracking_auto_convert` is set to.
+
+```python
+parent = TrackedDict()
+child = TrackedDict({"x": 0})
+parent["c"] = child
+child["x"] = 1  # parent records an entry at "c:x"
+```
+
+- **Several parents.** A child can be stored in more than one container. Each forwards the
+  change with its own path, so a change reached by two paths in one tree (a diamond) is recorded
+  once per path. Removing the child from one parent keeps it linked to the others.
+- **Same object twice.** Storing a child that is already a child of the container changes
+  nothing; removing one of two copies keeps it linked and relocates it.
+- **Locks.** A child is locked while any of its parents locks it. Storing a child into a
+  locked container is still rejected. Storing a locked standalone child into an unlocked
+  container unlocks it. `unlock()` on one parent leaves the child locked while another parent
+  still locks it. For a `TrackedAttr` parent, locking the attribute that holds the child counts.
+- **Thread locks.** Linking merges the two trees onto one lock; see [Threading](threading.md).
+- **Cycles.** A value that would close a cycle (the container itself, or anything that already
+  holds the container below it) is stored but not linked, so it does not forward.
+- **Unlinking.** Removing or overwriting the child unlinks it from that parent. A child left
+  with no parent gets a lock of its own.
+
+Migration: before this behavior, a pre-built child was stored without being linked. To keep a
+snapshot that does not forward, lock or share a thread lock, store `child.copy()` or a plain value.
+
 ### Tracking actors
 
 Set a temporary actor when mutating tracked objects to avoid stack inspection overhead:
@@ -150,8 +183,9 @@ records = RecordList()
 records.append("hello")  # stored as TrackedDict({"text": "hello"})
 ```
 
-A new tracked result is linked as a child, so its changes are forwarded to the container. A value
-that is already tracked and returned unchanged is not linked, as before. If the hook raises, the
+A new tracked result is linked as a child, so its changes are forwarded to the container, and so is
+a value that is already tracked and returned unchanged (see
+[Storing an already-tracked container](#storing-an-already-tracked-container)). If the hook raises, the
 insert is rejected and the container (contents, change log and child links) is left unchanged,
 including for batch inserts such as `extend` and `update`. Construction calls the hook inside
 `TrackBase.__init__`, so set any state the hook needs before calling `super().__init__()`.

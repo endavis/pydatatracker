@@ -45,7 +45,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 # 3rd Party
 # Project
-from ..types._trackbase import TrackBase, track_changes
+from ..types._trackbase import TrackBase, _TreeLockHold, track_changes
 
 if TYPE_CHECKING:
     from ..utils.changelog import ChangeLogEntry
@@ -161,6 +161,7 @@ class TrackedAttr(TrackBase):
 
         """
         value = self._tracking_convert_value(value, attribute_name)
+        self._tracking_link_stored_value(value, attribute_name)
         object.__setattr__(self, attribute_name, value)
         self._tracking_attributes_to_monitor.append(attribute_name)
         self._tracking_original_values[attribute_name] = value
@@ -214,6 +215,18 @@ class TrackedAttr(TrackBase):
             if uuid is not None and uuid not in locations:
                 locations[uuid] = name
         return locations
+
+    def _tracking_locks_child(self, child: TrackBase) -> bool:
+        """Return True if the whole object, or an attribute holding ``child``, is locked.
+
+        Args:
+            child: One of this instance's children.
+
+        """
+        if self._tracking_locked:
+            return True
+        locked: set[str] = self.__dict__.get("_tracking_locked_attributes") or set()
+        return any(self.__dict__.get(name) is child for name in locked)
 
     def _tracking_release_child(self, old_value: Any) -> None:
         """Unlink a child that is no longer held, or relocate it if still held.
@@ -276,6 +289,7 @@ class TrackedAttr(TrackBase):
 
         """
         converted = self._tracking_convert_value(value, attribute_name)
+        self._tracking_link_stored_value(converted, attribute_name)
         super().__setattr__(attribute_name, converted)
         self.tracking_create_change(
             action="start monitoring",
@@ -303,7 +317,7 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             if attribute_name in self._tracking_attributes_to_monitor:
                 return
             if hasattr(self, attribute_name):
@@ -442,16 +456,16 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             if not hasattr(self, attribute_name):
                 return
 
             if attribute_name in self._tracking_locked_attributes:
+                self._tracking_locked_attributes.discard(attribute_name)
                 value = getattr(self, attribute_name)
-                if self._tracking_is_trackable(value):
+                if self._tracking_is_trackable(value) and not value._tracking_any_parent_locks():
                     value.unlock()
 
-                self._tracking_locked_attributes.discard(attribute_name)
                 self.tracking_create_change(
                     action="unlock",
                     attribute_name=attribute_name,
@@ -502,7 +516,7 @@ class TrackedAttr(TrackBase):
             None
 
         """
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             if attribute_name:
                 self._tracking_unlock_attribute(attribute_name)
             else:
@@ -545,7 +559,8 @@ class TrackedAttr(TrackBase):
         ):
             object.__setattr__(self, attribute_name, value)
             return
-        with self._tracking_tree_lock:
+        self._tracking_premerge((value,), {})
+        with _TreeLockHold(self):
             self._tracking_setattr_locked(attribute_name, value, monitored)
 
     def _tracking_setattr_locked(
@@ -588,6 +603,7 @@ class TrackedAttr(TrackBase):
         is_tracking = self._tracking_is_tracking_attribute(attribute_name)
         if is_tracking:
             value = self._tracking_convert_value(value, attribute_name)
+            self._tracking_link_stored_value(value, attribute_name)
         super().__setattr__(attribute_name, value)
         if original_value is not value and original_value is not _NOT_SET:
             self._tracking_release_child(original_value)
@@ -612,7 +628,7 @@ class TrackedAttr(TrackBase):
         if monitored is None or attribute_name not in monitored:
             object.__delattr__(self, attribute_name)
             return
-        with self._tracking_tree_lock:
+        with _TreeLockHold(self):
             old_value = self.__dict__.get(attribute_name)
             object.__delattr__(self, attribute_name)
             self._tracking_release_child(old_value)

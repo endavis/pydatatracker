@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any, Self, SupportsIndex
 
 # 3rd Party
 # Project
-from ._trackbase import TrackBase, check_lock, track_changes
+from ._trackbase import TrackBase, check_lock, merges_trees, track_changes
 
 if TYPE_CHECKING:
     from ..utils.changelog import ChangeLogEntry
@@ -195,6 +195,7 @@ class TrackedList(TrackBase, list):
         self._tracking_record_change(change_log_entry)
         super()._tracking_notify_observers(change_log_entry)
 
+    @merges_trees
     @check_lock
     @track_changes
     def __setitem__(self, index: int | slice, item: Any) -> None:
@@ -324,6 +325,7 @@ class TrackedList(TrackBase, list):
         self._tracking_context["value"] = old_item
         self._tracking_context["location"] = index
 
+    @merges_trees
     @check_lock
     @track_changes
     def append(self, item: Any) -> None:
@@ -353,6 +355,7 @@ class TrackedList(TrackBase, list):
         self._tracking_context["value"] = item
         self._tracking_context["location"] = index
 
+    @merges_trees
     @check_lock
     @track_changes
     def extend(self, items: list) -> None:
@@ -443,6 +446,7 @@ class TrackedList(TrackBase, list):
         self._tracking_context["multiplier"] = count
         return self
 
+    @merges_trees
     @check_lock
     @track_changes
     def insert(self, index: int, item: Any) -> None:
