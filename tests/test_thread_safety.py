@@ -149,7 +149,9 @@ def test_attr_concurrent_assignment_records_every_change_exactly() -> None:
         def _run() -> None:
             for i in range(ROUNDS):
                 # Alternating a converted dict and a scalar links and unlinks a child.
-                obj.v = {"t": tid, "i": i} if i % 2 == 0 else i
+                # Values are unique per thread: two threads assigning an equal
+                # value back to back is correctly not recorded as a change.
+                obj.v = {"t": tid, "i": i} if i % 2 == 0 else tid * ROUNDS + i
 
         return _run
 
