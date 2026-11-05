@@ -574,12 +574,19 @@ class TrackedList(TrackBase, list):
 
         """
         if not self._tracking_locked:
+            if not list.__len__(self):
+                return  # no-op: records nothing
             for item in self:
                 self._tracking_context.setdefault("removed_items", []).append(item)
 
             super().clear()
 
         self._tracking_context["action"] = "remove"
+
+    def _tracking_order_unchanged(self, before: "list[Any]") -> bool:
+        """Return True if the items are the same objects in the same order as ``before``."""
+        after = list(list.__iter__(self))
+        return len(before) == len(after) and all(a is b for a, b in zip(before, after, strict=True))
 
     @check_lock
     @track_changes
@@ -600,7 +607,10 @@ class TrackedList(TrackBase, list):
 
         """
         if not self._tracking_locked:
+            before = list(list.__iter__(self))
             super().sort(key=key, reverse=reverse)
+            if self._tracking_order_unchanged(before):
+                return  # no-op: records nothing
             self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "update"
@@ -620,7 +630,10 @@ class TrackedList(TrackBase, list):
 
         """
         if not self._tracking_locked:
+            before = list(list.__iter__(self))
             super().reverse()
+            if self._tracking_order_unchanged(before):
+                return  # no-op: records nothing
             self._tracking_reindex_child_locations()
 
         self._tracking_context["action"] = "update"
