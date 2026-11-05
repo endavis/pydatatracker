@@ -291,7 +291,7 @@ class TrackedAttr(TrackBase):
         converted = self._tracking_convert_value(value, attribute_name)
         self._tracking_link_stored_value(converted, attribute_name)
         super().__setattr__(attribute_name, converted)
-        self.tracking_create_change(
+        self._tracking_create_change_locked(
             action="start monitoring",
             location=f"{attribute_name}",
             value=value,
@@ -368,7 +368,7 @@ class TrackedAttr(TrackBase):
             "data_pre_change": original_value,
             "data_post_change": getattr(self, attribute_name),
         }
-        self.tracking_create_change(
+        self._tracking_create_change_locked(
             action="update",
             method=method,
             location=f"{attribute_name}",
@@ -466,7 +466,7 @@ class TrackedAttr(TrackBase):
                 if self._tracking_is_trackable(value) and not value._tracking_any_parent_locks():
                     value.unlock()
 
-                self.tracking_create_change(
+                self._tracking_create_change_locked(
                     action="unlock",
                     attribute_name=attribute_name,
                     attribute_locked=self._tracking_is_locked_attribute(attribute_name),
@@ -524,7 +524,7 @@ class TrackedAttr(TrackBase):
                 for attribute in self._tracking_attributes_to_monitor:
                     self._tracking_unlock_attribute(attribute)
 
-                self.tracking_create_change(action="unlock")
+                self._tracking_create_change_locked(action="unlock")
 
     def __setattr__(self, attribute_name: str, value: Any) -> None:
         """Set the value of the specified attribute.
