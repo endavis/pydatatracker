@@ -146,5 +146,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 
 | ADR | Title | Status |
 |-----|-------|--------|
-
-_(No project-level ADRs yet.)_
+| [0001](0001-tracked-containers-serialize-mutations-with-a-tree-wide-rlock.md) | Tracked containers serialize mutations with a tree-wide RLock | Accepted |
