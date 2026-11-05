@@ -763,3 +763,39 @@ def test_negative_and_large_index_out_of_range_still_raises(index: int) -> None:
     with pytest.raises(IndexError):
         tracked.pop(index)
     assert list(tracked) == [1, 2, 3]
+
+
+def test_tracked_list_copy_records_no_change() -> None:
+    """`copy()` is a read: it adds no change entry."""
+    tracked = TrackedList([1, 2])
+    before = len(tracked.tracking_changes())
+
+    assert tracked.copy() == [1, 2]
+
+    assert len(tracked.tracking_changes()) == before
+
+
+def test_tracked_list_copy_works_when_locked() -> None:
+    """`copy()` does not raise on a locked list."""
+    tracked = TrackedList([1, 2])
+    tracked.lock()
+    before = len(tracked.tracking_changes())
+
+    assert tracked.copy() == [1, 2]
+    assert tracked.copy(untracked=False) == [1, 2]
+
+    assert len(tracked.tracking_changes()) == before
+
+
+def test_tracked_list_copy_is_deep_and_plain() -> None:
+    """The default copy converts nested tracked values to plain containers."""
+    tracked = TrackedList([{"a": [1]}], tracking_auto_convert=True)
+
+    clone = tracked.copy()
+    shallow = tracked.copy(untracked=False)
+
+    assert type(clone) is list
+    assert type(clone[0]) is dict
+    assert type(clone[0]["a"]) is list
+    assert type(shallow) is list
+    assert shallow[0] is tracked[0]
