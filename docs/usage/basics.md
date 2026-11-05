@@ -110,6 +110,22 @@ print([entry.extra["location"] for entry in changes])
 
 `changes_since(...)` also accepts a datetime; a naive datetime is interpreted as local time.
 
+### Sort and reverse entries
+
+`TrackedList.sort` and `TrackedList.reverse` record one `update` entry for a real reorder. Its
+`value` is the permutation: the old indexes in their new order, so
+`new = [old[i] for i in value]`. Its `location` lists every index, comma-joined. A sort or reverse
+that leaves the order unchanged records nothing.
+
+```python
+tracked = TrackedList(["c", "a", "b"])
+tracked.sort()
+entry = tracked.last_change()
+# entry.extra["value"] == [1, 2, 0]; entry.extra["location"] == "0,1,2"
+```
+
+Equal items keep their relative order, as in `list.sort`.
+
 ### Capping change history
 
 By default every change is kept, so a long-running process grows without limit. Pass

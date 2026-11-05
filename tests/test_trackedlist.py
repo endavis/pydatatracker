@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+
 import pytest
 
 from pydatatracker import TrackedDict, TrackedList
@@ -833,3 +835,78 @@ def test_tracked_list_copy_is_deep_and_plain() -> None:
     assert type(clone[0]["a"]) is list
     assert type(shallow) is list
     assert shallow[0] is tracked[0]
+
+
+def _perm(tracked: TrackedList) -> tuple[list[int], object]:
+    """Return the latest entry's permutation (stored as its repr) and location."""
+    extra = _latest_change(tracked).extra
+    return ast.literal_eval(extra["value"]), extra["location"]
+
+
+def test_tracked_list_sort_records_permutation() -> None:
+    """A sort records the old indexes in their new order."""
+    tracked = TrackedList(["c", "a", "b"])
+    tracked.sort()
+    assert list(tracked) == ["a", "b", "c"]
+    assert _perm(tracked) == ([1, 2, 0], "0,1,2")
+    assert _latest_change(tracked).extra["action"] == "update"
+
+
+def test_tracked_list_sort_reverse_and_key_record_permutation() -> None:
+    """reverse=True and key= both record a permutation."""
+    tracked = TrackedList([2, 3, 1])
+    tracked.sort(reverse=True)
+    assert list(tracked) == [3, 2, 1]
+    assert _perm(tracked) == ([1, 0, 2], "0,1,2")
+
+    keyed = TrackedList(["bb", "a", "ccc"])
+    keyed.sort(key=len)
+    assert list(keyed) == ["a", "bb", "ccc"]
+    assert _perm(keyed) == ([1, 0, 2], "0,1,2")
+
+
+def test_tracked_list_reverse_records_permutation() -> None:
+    """Reverse records the reversed index order."""
+    tracked = TrackedList([1, 2, 3])
+    tracked.reverse()
+    assert list(tracked) == [3, 2, 1]
+    assert _perm(tracked) == ([2, 1, 0], "0,1,2")
+
+
+def test_tracked_list_sort_equal_items_are_stable() -> None:
+    """Equal keys keep their original relative order, also with reverse=True."""
+    tracked = TrackedList(["b1", "a1", "b2", "a2"])
+    tracked.sort(key=lambda s: s[0])
+    assert list(tracked) == ["a1", "a2", "b1", "b2"]
+    assert _perm(tracked)[0] == [1, 3, 0, 2]
+
+    rev = TrackedList(["b1", "a1", "b2", "a2"])
+    rev.sort(key=lambda s: s[0], reverse=True)
+    assert list(rev) == ["b1", "b2", "a1", "a2"]
+    assert _perm(rev)[0] == [0, 2, 1, 3]
+
+
+def test_tracked_list_noop_sort_and_reverse_record_nothing() -> None:
+    """A sort or reverse that changes nothing records no entry."""
+    tracked = TrackedList([1, 2, 3])
+    before = len(tracked.tracking_changes())
+    tracked.sort()
+    same = TrackedList([5, 5])
+    n = len(same.tracking_changes())
+    same.reverse()
+    assert len(tracked.tracking_changes()) == before
+    assert len(same.tracking_changes()) == n
+
+
+def test_tracked_list_sort_key_error_leaves_list_unchanged() -> None:
+    """An exception from the key leaves the list and history untouched."""
+    tracked = TrackedList([3, 1, 2])
+    before = len(tracked.tracking_changes())
+
+    def boom(_: int) -> int:
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        tracked.sort(key=boom)
+    assert list(tracked) == [3, 1, 2]
+    assert len(tracked.tracking_changes()) == before
