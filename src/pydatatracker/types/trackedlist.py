@@ -527,10 +527,18 @@ class TrackedList(TrackBase, list):
 
         self._tracking_context["action"] = "remove"
 
-    def _tracking_order_unchanged(self, before: "list[Any]") -> bool:
-        """Return True if the items are the same objects in the same order as ``before``."""
-        after = list(list.__iter__(self))
-        return len(before) == len(after) and all(a is b for a, b in zip(before, after, strict=True))
+    def _tracking_apply_permutation(self, order: "list[int]") -> None:
+        """Reorder in place by ``order`` and record it; record nothing if no item moves."""
+        items = list(list.__iter__(self))
+        reordered = [items[i] for i in order]
+        if all(a is b for a, b in zip(items, reordered, strict=True)):
+            return  # no-op: records nothing
+        list.__setitem__(self, slice(None), reordered)
+        self._tracking_reindex_child_locations()
+
+        self._tracking_context["action"] = "update"
+        self._tracking_context["value"] = order
+        self._tracking_context["location"] = ",".join(str(i) for i in range(len(order)))
 
     @check_lock
     @track_changes
@@ -539,6 +547,11 @@ class TrackedList(TrackBase, list):
 
         This method sorts the tracked list in place, updating the tracking context
         with the action details. It also updates the indices of tracked child items.
+
+        A real reorder records one ``update`` entry whose ``value`` is the permutation:
+        the old indexes in their new order, so ``new = [old[i] for i in value]``, and whose
+        ``location`` lists every index, e.g. ``"0,1,2"``. A sort that changes nothing
+        records no entry.
 
         Args:
             key: A function that serves as a key for the sort comparison.
@@ -550,13 +563,13 @@ class TrackedList(TrackBase, list):
             >>> tracked_list.sort(reverse=True)  # Sort is tracked
 
         """
-        before = list(list.__iter__(self))
-        super().sort(key=key, reverse=reverse)
-        if self._tracking_order_unchanged(before):
-            return  # no-op: records nothing
-        self._tracking_reindex_child_locations()
-
-        self._tracking_context["action"] = "update"
+        items = list(list.__iter__(self))
+        order = sorted(
+            range(len(items)),
+            key=(lambda i: key(items[i])) if key is not None else items.__getitem__,
+            reverse=reverse,
+        )
+        self._tracking_apply_permutation(order)
 
     @check_lock
     @track_changes
@@ -565,20 +578,14 @@ class TrackedList(TrackBase, list):
 
         This method reverses the order of items in the tracked list, updating the
         tracking context with the action details. It also updates the indices of
-        tracked child items.
+        tracked child items. The entry's ``value`` is the permutation, as for ``sort``.
 
         Example:
             >>> tracked_list = TrackedList([1, 2, 3])
             >>> tracked_list.reverse()  # Reverse is tracked
 
         """
-        before = list(list.__iter__(self))
-        super().reverse()
-        if self._tracking_order_unchanged(before):
-            return  # no-op: records nothing
-        self._tracking_reindex_child_locations()
-
-        self._tracking_context["action"] = "update"
+        self._tracking_apply_permutation(list(range(list.__len__(self) - 1, -1, -1)))
 
     def copy(self, untracked: bool = True) -> "list[Any]":
         """Return a copy of the list; this is a read.
