@@ -118,6 +118,12 @@ class _TreeLockHold:
         self._lock.release()
 
 
+# Maps a ``track_changes`` wrapper to its lock-free body, so ``check_lock`` can
+# run it under the lock it already holds. A registry, not a wrapper attribute:
+# ``functools.wraps`` copies ``__dict__`` and would leak it to outer wrappers.
+_UNLOCKED_BODIES: dict[Callable[..., Any], Callable[..., Any]] = {}
+
+
 def merges_trees(method: Callable[..., Any]) -> Callable[..., Any]:
     """Merge the tree locks of already-tracked arguments into the instance's before storing.
 
@@ -147,6 +153,10 @@ def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
     executing the method. If the instance is locked, it raises a RuntimeError,
     preventing any modifications to the object.
 
+    The check and the wrapped method run under one acquisition of the tree
+    lock. If ``method`` is a ``track_changes`` wrapper, its lock-free body runs
+    under that acquisition instead of taking the lock again.
+
     Args:
         method: The method to be decorated for lock checking.
 
@@ -154,6 +164,10 @@ def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
         The wrapped method that includes lock checking functionality.
 
     """
+
+    # When wrapping a ``track_changes`` wrapper, run its lock-free body: this
+    # wrapper already holds the tree lock, so the tree lock is taken once per call.
+    body = _UNLOCKED_BODIES.get(method, method)
 
     @wraps(method)
     def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
@@ -182,7 +196,7 @@ def check_lock(method: Callable[..., Any]) -> Callable[..., Any]:
         try:
             if self._tracking_locked:
                 raise RuntimeError(f"{self.__class__.__name__} is locked and cannot be modified.")
-            return method(self, *args, **kwargs)
+            return body(self, *args, **kwargs)
         finally:
             held.release()
 
@@ -197,6 +211,9 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
     the method execution, and logs any changes, including removed items and
     updates to tracked objects.
 
+    The wrapper takes the tree lock itself. Under ``check_lock`` the lock-free
+    body runs instead, inside the lock ``check_lock`` holds.
+
     Args:
         method: The method to be decorated for change tracking.
 
@@ -207,12 +224,7 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
 
     @wraps(method)
     def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-        """Track changes to the object before and after method execution.
-
-        This function is used as a decorator to monitor changes made to the object
-        by capturing its state before and after the method execution. It logs any
-        changes, including removed items and updates to tracked objects, ensuring
-        that all modifications are recorded and can be retrieved later.
+        """Track changes to the object under the tree lock.
 
         Args:
             self: The instance of the class.
@@ -224,53 +236,67 @@ def track_changes(method: Callable[..., Any]) -> Callable[..., Any]:
 
         """
         with _TreeLockHold(self):
-            # reset the tracking context
-            data_pre_change = None
-            if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in [
-                "TrackedDict",
-                "TrackedList",
-            ]:
-                data_pre_change = repr(self)
+            return _run_tracked(self, method, args, kwargs)
 
-            self._tracking_context = {}
+    def unlocked(self: Any, *args: Any, **kwargs: Any) -> Any:
+        return _run_tracked(self, method, args, kwargs)
 
-            # Call the original method
-            result = method(self, *args, **kwargs)
-
-            # Check if the object has a tracking_context attribute (for tracking changes)
-            if self._tracking_context and "action" in self._tracking_context:
-                if "removed_items" in self._tracking_context:
-                    # A removed child still held under another index or key stays
-                    # linked and is relocated; only children no longer held are unlinked.
-                    present: dict[str, Any] | None = None
-                    handled: set[int] = set()
-                    for olditem in self._tracking_context["removed_items"]:
-                        if not self._tracking_is_trackable(olditem) or id(olditem) in handled:
-                            continue
-                        handled.add(id(olditem))
-                        if present is None:
-                            present = self._tracking_present_child_locations()
-                        uuid = olditem._tracking_uuid
-                        if uuid in present:
-                            if uuid in self._tracking_child_tracked_items:
-                                self._tracking_child_tracked_items[uuid]["location"] = present[uuid]
-                            continue
-                        self._tracking_remove_child_tracked_item(olditem)
-
-                if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in [
-                    "TrackedDict",
-                    "TrackedList",
-                ]:
-                    self._tracking_context["data_pre_change"] = data_pre_change
-                    self._tracking_context["data_post_change"] = repr(self)
-                self._tracking_context["method"] = method.__name__
-                self.tracking_create_change(**self._tracking_context)
-
-            self._tracking_context = {}
-
-            return result
-
+    _UNLOCKED_BODIES[wrapper] = unlocked
     return wrapper
+
+
+def _run_tracked(self: Any, method: Callable[..., Any], args: Any, kwargs: Any) -> Any:
+    """Run ``method`` and record its change; the caller must hold the tree lock.
+
+    Captures the state before and after the method, logs the change, and
+    unlinks removed children. The entry is created with
+    ``_tracking_create_change_locked`` because the lock is already held.
+    """
+    # reset the tracking context
+    data_pre_change = None
+    if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in [
+        "TrackedDict",
+        "TrackedList",
+    ]:
+        data_pre_change = repr(self)
+
+    self._tracking_context = {}
+
+    # Call the original method
+    result = method(self, *args, **kwargs)
+
+    # Check if the object has a tracking_context attribute (for tracking changes)
+    if self._tracking_context and "action" in self._tracking_context:
+        if "removed_items" in self._tracking_context:
+            # A removed child still held under another index or key stays
+            # linked and is relocated; only children no longer held are unlinked.
+            present: dict[str, Any] | None = None
+            handled: set[int] = set()
+            for olditem in self._tracking_context["removed_items"]:
+                if not self._tracking_is_trackable(olditem) or id(olditem) in handled:
+                    continue
+                handled.add(id(olditem))
+                if present is None:
+                    present = self._tracking_present_child_locations()
+                uuid = olditem._tracking_uuid
+                if uuid in present:
+                    if uuid in self._tracking_child_tracked_items:
+                        self._tracking_child_tracked_items[uuid]["location"] = present[uuid]
+                    continue
+                self._tracking_remove_child_tracked_item(olditem)
+
+        if self._tracking_capture_snapshots and self._tracking_is_trackable(self) in [
+            "TrackedDict",
+            "TrackedList",
+        ]:
+            self._tracking_context["data_pre_change"] = data_pre_change
+            self._tracking_context["data_post_change"] = repr(self)
+        self._tracking_context["method"] = method.__name__
+        self._tracking_create_change_locked(**self._tracking_context)
+
+    self._tracking_context = {}
+
+    return result
 
 
 class _ObserverRef:
@@ -1189,7 +1215,21 @@ class TrackBase:
         )
 
     def tracking_create_change(self, **kwargs: Any) -> None:
-        """Create a change log entry for the tracked object.
+        """Create a change log entry for the tracked object under the tree lock.
+
+        Takes the tree lock and calls ``_tracking_create_change_locked``. Internal
+        mutating paths that already hold the lock call the locked body directly,
+        so an override of this method does not see them.
+
+        Args:
+            **kwargs: Keyword arguments for the change log entry.
+
+        """
+        with _TreeLockHold(self):
+            self._tracking_create_change_locked(**kwargs)
+
+    def _tracking_create_change_locked(self, **kwargs: Any) -> None:
+        """Create a change log entry; the caller must hold the tree lock.
 
         This method generates a new change log entry based on the provided keyword
         arguments. It includes details such as the action performed, the state of
@@ -1204,23 +1244,22 @@ class TrackBase:
             None
 
         """
-        with _TreeLockHold(self):
-            if "locked" not in kwargs:
-                kwargs["locked"] = self._tracking_locked
-            if "type" not in kwargs:
-                kwargs["type"] = self._tracking_is_trackable(self)
-            if "actor" not in kwargs:
-                kwargs["actor"] = current_actor.get()
-            change_log_entry = ChangeLogEntry(
-                self._tracking_uuid,
-                capture_stack=self._tracking_capture_stack,
-                **kwargs,
-            )
-            change_log_entry.add_to_tree(
-                self._tracking_format_tree_location(change_log_entry.extra.get("location", None))
-            )
-            self._tracking_record_change(change_log_entry)
-            self._tracking_notify_observers(change_log_entry)
+        if "locked" not in kwargs:
+            kwargs["locked"] = self._tracking_locked
+        if "type" not in kwargs:
+            kwargs["type"] = self._tracking_is_trackable(self)
+        if "actor" not in kwargs:
+            kwargs["actor"] = current_actor.get()
+        change_log_entry = ChangeLogEntry(
+            self._tracking_uuid,
+            capture_stack=self._tracking_capture_stack,
+            **kwargs,
+        )
+        change_log_entry.add_to_tree(
+            self._tracking_format_tree_location(change_log_entry.extra.get("location", None))
+        )
+        self._tracking_record_change(change_log_entry)
+        self._tracking_notify_observers(change_log_entry)
 
     def _tracking_record_change(self, change_log_entry: ChangeLogEntry) -> bool:
         """Append an entry to the change history unless it is already recorded.
@@ -1294,7 +1333,7 @@ class TrackBase:
             self._tracking_locked = True
             for key in self._tracking_child_tracked_items:
                 self._tracking_child_tracked_items[key]["item"].lock()
-            self.tracking_create_change(action="lock")
+            self._tracking_create_change_locked(action="lock")
 
     def unlock(self) -> None:
         """Unlock the instance and all child tracked items.
@@ -1316,7 +1355,7 @@ class TrackBase:
                 child = self._tracking_child_tracked_items[key]["item"]
                 if not child._tracking_any_parent_locks():
                     child.unlock()
-            self.tracking_create_change(action="unlock")
+            self._tracking_create_change_locked(action="unlock")
 
     def tracking_get_formatted_updates(self) -> list[str]:
         """Retrieve a formatted list of the most recent changes.
